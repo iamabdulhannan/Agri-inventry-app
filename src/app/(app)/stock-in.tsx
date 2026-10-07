@@ -2,12 +2,10 @@ import { router, useLocalSearchParams } from 'expo-router'
 import { CalendarDays, Check, ChevronDown, ChevronRight, Pencil, Plus, Trash2, Truck, Undo2 } from 'lucide-react-native'
 import { useEffect, useMemo, useState } from 'react'
 import { Pressable, ScrollView, View } from 'react-native'
-import Animated, { FadeInDown, FadeOut, LinearTransition } from 'react-native-reanimated'
 import { BalanceBadge, PartyAvatar, PartyPickerSheet, ProductAvatar, ProductPickerSheet, usePackLabel } from '@/components/domain'
 import { PartyFormSheet, ProductFormSheet } from '@/components/forms'
 import {
-  Button, CalendarSheet, Card, DateField, ErrorBox, Field, IconBtn, IconTile, Input, Loading, NumInput, PressScale, Row, Screen, Segmented, Stepper, Txt, useFeedback,
-} from '@/components/ui'
+  Button, CalendarSheet, Card, DateField, ErrorBox, Field, IconBtn, IconTile, Input, Loading, NumInput, PressScale, Row, Screen, Segmented, Stepper, Txt, useFeedback, Rise } from '@/components/ui'
 import { useOrg } from '@/lib/app'
 import { loadBatches, loadCatalog, loadParties } from '@/lib/catalog'
 import { useLoad } from '@/lib/data'
@@ -270,7 +268,7 @@ export default function StockIn() {
           const known = existing.find((b) => b.batch_no.toLowerCase() === l.batch_no.trim().toLowerCase())
           const expLeft = l.expiry_date ? daysBetween(today, l.expiry_date) : null
           return (
-            <Animated.View key={l.key} entering={FadeInDown.springify().damping(16)} exiting={FadeOut.duration(180)} layout={LinearTransition.springify()}>
+            <Rise key={l.key}>
               <Card style={{ padding: 14, gap: 12 }}>
                 <Row gap={12}>
                   <ProductAvatar p={p} size={42} />
@@ -322,7 +320,7 @@ export default function StockIn() {
                   </Field>
                 )}
               </Card>
-            </Animated.View>
+            </Rise>
           )
         })}
         <PressScale onPress={() => setPicking(true)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, height: 64, borderRadius: 22, borderWidth: 2, borderStyle: 'dashed', borderColor: c.primary + '90', backgroundColor: c.primarySoft }}>

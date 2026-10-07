@@ -2,9 +2,8 @@ import { router } from 'expo-router'
 import { Lock, Mail } from 'lucide-react-native'
 import { useState } from 'react'
 import { Pressable, View } from 'react-native'
-import Animated, { FadeInDown } from 'react-native-reanimated'
 import { LogoBadge } from '@/components/Logo'
-import { Button, ErrorBox, Field, Input, PasswordInput, Screen, Txt } from '@/components/ui'
+import { Button, ErrorBox, Field, Input, PasswordInput, Screen, Txt, Rise } from '@/components/ui'
 import { errText } from '@/lib/errors'
 import { useI18n } from '@/lib/i18n'
 import { supabase, supabaseConfigured } from '@/lib/supabase'
@@ -34,12 +33,12 @@ export default function SignIn() {
 
   return (
     <Screen back>
-      <Animated.View entering={FadeInDown.duration(500)} style={{ gap: 6, marginBottom: 28, marginTop: 8 }}>
+      <Rise style={{ gap: 6, marginBottom: 28, marginTop: 8 }}>
         <LogoBadge size={64} />
         <Txt v="display" style={{ marginTop: 18 }}>{t('signIn')}</Txt>
         <Txt muted>{t('tagline')}</Txt>
-      </Animated.View>
-      <Animated.View entering={FadeInDown.delay(120).duration(500)} style={{ gap: 16 }}>
+      </Rise>
+      <Rise i={2} style={{ gap: 16 }}>
         <Field label={t('email')}>
           <Input
             value={email}
@@ -71,7 +70,7 @@ export default function SignIn() {
             <Txt weight="bold" color={c.primary}>{t('signUp')}</Txt>
           </Pressable>
         </View>
-      </Animated.View>
+      </Rise>
     </Screen>
   )
 }

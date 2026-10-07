@@ -2,6 +2,7 @@ import '@/lib/supabase'
 import {
   PlusJakartaSans_400Regular, PlusJakartaSans_500Medium, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold, PlusJakartaSans_800ExtraBold, useFonts,
 } from '@expo-google-fonts/plus-jakarta-sans'
+import Constants, { ExecutionEnvironment } from 'expo-constants'
 import { Stack } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
 import { StatusBar } from 'expo-status-bar'
@@ -17,7 +18,8 @@ import { I18nProvider } from '@/lib/i18n'
 import { ThemeProvider, useTheme } from '@/lib/theme'
 
 SplashScreen.preventAutoHideAsync().catch(() => {})
-SplashScreen.setOptions({ fade: true, duration: 200 })
+// not supported inside Expo Go (only in real builds)
+if (Constants.executionEnvironment !== ExecutionEnvironment.StoreClient) SplashScreen.setOptions({ fade: true, duration: 200 })
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
@@ -54,20 +56,17 @@ function Root() {
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <StatusBar style={splash || c.dark ? 'light' : 'dark'} />
-      {/* mount the navigator once auth is known, so guards don't redirect away from the opened route */}
-      {ready && (
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.bg }, animation: 'fade_from_bottom' }}>
-          <Stack.Protected guard={!session}>
-            <Stack.Screen name="(auth)" />
-          </Stack.Protected>
-          <Stack.Protected guard={!!session && !org}>
-            <Stack.Screen name="no-org" />
-          </Stack.Protected>
-          <Stack.Protected guard={!!session && !!org}>
-            <Stack.Screen name="(app)" />
-          </Stack.Protected>
-        </Stack>
-      )}
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.bg }, animation: 'fade_from_bottom' }}>
+        <Stack.Protected guard={!session}>
+          <Stack.Screen name="(auth)" />
+        </Stack.Protected>
+        <Stack.Protected guard={!!session && !org}>
+          <Stack.Screen name="no-org" />
+        </Stack.Protected>
+        <Stack.Protected guard={!!session && !!org}>
+          <Stack.Screen name="(app)" />
+        </Stack.Protected>
+      </Stack>
       {splash && <Splash ready={ready} onDone={() => setSplash(false)} />}
     </View>
   )

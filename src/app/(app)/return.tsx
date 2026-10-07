@@ -2,9 +2,8 @@ import { router, useLocalSearchParams } from 'expo-router'
 import { CalendarDays, Check, ReceiptText, Search, Undo2 } from 'lucide-react-native'
 import { useEffect, useState } from 'react'
 import { View } from 'react-native'
-import Animated, { FadeInDown } from 'react-native-reanimated'
 import { ProductAvatar, usePackLabel } from '@/components/domain'
-import { Badge, Button, CalendarSheet, Card, Empty, ErrorBox, Field, IconTile, Input, Loading, NumInput, PressScale, Row, Screen, Stepper, Txt, useFeedback } from '@/components/ui'
+import { Badge, Button, CalendarSheet, Card, Empty, ErrorBox, Field, IconTile, Input, Loading, NumInput, PressScale, Row, Screen, Stepper, Txt, useFeedback, Rise } from '@/components/ui'
 import { useOrg } from '@/lib/app'
 import { useCatalog } from '@/lib/catalog'
 import { errText } from '@/lib/errors'
@@ -161,7 +160,7 @@ export default function InvoiceReturn() {
             const kg = unitLabel('kg', lang)
             const over = packsOf(l) > l.remaining
             return (
-              <Animated.View key={l.batch_id} entering={FadeInDown.delay(i * 60).springify().damping(16)}>
+              <Rise key={l.batch_id} i={i}>
                 <Card style={{ padding: 14, gap: 10, opacity: l.remaining > 0 ? 1 : 0.5 }} glow={over ? 'red' : undefined}>
                   <Row gap={12}>
                     {p && <ProductAvatar p={p} size={40} />}
@@ -185,7 +184,7 @@ export default function InvoiceReturn() {
                     <Button size="sm" variant="ghost" title={`${t('all')}: ${fmtNum(shown(l, l.remaining), 3)}`} onPress={() => setQty((q) => ({ ...q, [l.batch_id]: String(shown(l, l.remaining)) }))} style={{ alignSelf: 'flex-start' }} />
                   )}
                 </Card>
-              </Animated.View>
+              </Rise>
             )
           })}
         </View>

@@ -32,7 +32,10 @@ export function Input({
   const { c } = useTheme()
   const [focus, setFocus] = useState(false)
   return (
+    // collapsable={false}: Android (new architecture) must never re-parent the native text field,
+    // or it loses focus and the keyboard closes right after opening
     <View
+      collapsable={false}
       style={[
         {
           flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: c.surface, borderRadius: radius.md, borderWidth: 1.5,
@@ -210,7 +213,7 @@ export function Stepper({ value, onChange, step = 1, min = 0, invalid }: { value
     </PressScale>
   )
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: c.surface, borderRadius: radius.md, borderWidth: 1.5, borderColor: invalid ? c.red : c.border, padding: 3 }}>
+    <View collapsable={false} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: c.surface, borderRadius: radius.md, borderWidth: 1.5, borderColor: invalid ? c.red : c.border, padding: 3 }}>
       {btn(<Minus size={18} color={c.text} />, -step)}
       <TextInput
         value={value}

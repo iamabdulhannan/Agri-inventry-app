@@ -2,12 +2,10 @@ import { router, useLocalSearchParams } from 'expo-router'
 import { CalendarDays, Check, ChevronDown, Layers, Plus, ShoppingBag, Trash2, UserRound } from 'lucide-react-native'
 import { useEffect, useMemo, useState } from 'react'
 import { Pressable, View } from 'react-native'
-import Animated, { FadeInDown, FadeOut, LinearTransition } from 'react-native-reanimated'
 import { BalanceBadge, PartyAvatar, PartyPickerSheet, ProductAvatar, ProductPickerSheet, usePackLabel } from '@/components/domain'
 import { PartyFormSheet } from '@/components/forms'
 import {
-  Badge, Button, CalendarSheet, Card, ErrorBox, Field, IconBtn, Input, Loading, NumInput, PickerSheet, PressScale, Row, Screen, Segmented, Stepper, Txt, useFeedback,
-} from '@/components/ui'
+  Badge, Button, CalendarSheet, Card, ErrorBox, Field, IconBtn, Input, Loading, NumInput, PickerSheet, PressScale, Row, Screen, Segmented, Stepper, Txt, useFeedback, Rise } from '@/components/ui'
 import { useOrg } from '@/lib/app'
 import { loadBatches, loadCatalog, loadParties } from '@/lib/catalog'
 import { useLoad } from '@/lib/data'
@@ -251,7 +249,7 @@ export default function Sale() {
           const cost = Number(p.purchase_price) / (loose ? size : 1)
           const profit = (Number(l.rate) - cost) * (Number(l.qty) || 0)
           return (
-            <Animated.View key={l.key} entering={FadeInDown.springify().damping(16)} exiting={FadeOut.duration(180)} layout={LinearTransition.springify()}>
+            <Rise key={l.key}>
               <Card style={{ padding: 14 }} glow={over || badStep ? 'red' : undefined}>
                 <Row gap={12}>
                   <ProductAvatar p={p} size={42} />
@@ -311,7 +309,7 @@ export default function Sale() {
                   </Row>
                 )}
               </Card>
-            </Animated.View>
+            </Rise>
           )
         })}
 

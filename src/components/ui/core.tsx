@@ -293,7 +293,8 @@ export function Rise({ children, i = 0, style }: { children: ReactNode; i?: numb
     o.set(withDelay(Math.min(i, 12) * 55, withTiming(1, { duration: 480, easing: Easing.out(Easing.cubic) })))
   }, [o, i])
   const a = useAnimatedStyle(() => ({ opacity: o.value, transform: [{ translateY: (1 - o.value) * 18 }] }))
-  return <Animated.View style={[style, a]}>{children}</Animated.View>
+  // collapsable={false}: stays one stable native view, so text fields inside keep focus on Android
+  return <Animated.View collapsable={false} style={[style, a]}>{children}</Animated.View>
 }
 
 const styles = StyleSheet.create({

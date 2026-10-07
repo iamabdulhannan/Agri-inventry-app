@@ -2,8 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router'
 import { Building2, CheckCircle2, Lock, Mail, MailCheck, Store, Ticket, User } from 'lucide-react-native'
 import { useState } from 'react'
 import { Pressable, View } from 'react-native'
-import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated'
-import { Button, ErrorBox, Field, Input, PasswordInput, Row, Screen, Segmented, Txt } from '@/components/ui'
+import { Button, ErrorBox, Field, Input, PasswordInput, Row, Screen, Segmented, Txt, Rise } from '@/components/ui'
 import { errText } from '@/lib/errors'
 import { useI18n } from '@/lib/i18n'
 import { supabase, supabaseConfigured } from '@/lib/supabase'
@@ -75,24 +74,24 @@ export default function SignUp() {
   if (checkEmail) {
     return (
       <Screen back>
-        <Animated.View entering={FadeIn} style={{ alignItems: 'center', gap: 14, marginTop: 60 }}>
+        <Rise style={{ alignItems: 'center', gap: 14, marginTop: 60 }}>
           <View style={{ width: 96, height: 96, borderRadius: 32, backgroundColor: c.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
             <MailCheck size={44} color={c.primary} />
           </View>
           <Txt v="h1" align="center">{t('checkEmailTitle')}</Txt>
           <Txt muted align="center">{t('confirmStillOn')}</Txt>
           <Button title={t('signIn')} onPress={() => router.replace('/sign-in')} style={{ marginTop: 10, alignSelf: 'stretch' }} size="lg" />
-        </Animated.View>
+        </Rise>
       </Screen>
     )
   }
 
   return (
     <Screen back>
-      <Animated.View entering={FadeInDown.duration(500)} style={{ marginBottom: 22, marginTop: 4 }}>
+      <Rise style={{ marginBottom: 22, marginTop: 4 }}>
         <Txt v="display">{mode === 'create' ? t('createOrg') : t('joinOrg')}</Txt>
         <Txt muted style={{ marginTop: 6 }}>{mode === 'create' ? t('createOrgHint') : t('joinOrgHint')}</Txt>
-      </Animated.View>
+      </Rise>
 
       <Segmented
         value={mode}
@@ -122,10 +121,10 @@ export default function SignUp() {
               <Button variant="secondary" title={t('checkCode')} loading={checking} onPress={checkCode} />
             </Row>
             {invite && (
-              <Animated.View entering={FadeInDown} style={{ flexDirection: 'row', gap: 8, alignItems: 'center', backgroundColor: c.primarySoft, padding: 12, borderRadius: 14, marginTop: 4 }}>
+              <Rise style={{ flexDirection: 'row', gap: 8, alignItems: 'center', backgroundColor: c.primarySoft, padding: 12, borderRadius: 14, marginTop: 4 }}>
                 <CheckCircle2 size={18} color={c.primary} />
                 <Txt v="small" weight="semibold" style={{ flex: 1 }}>{t('joiningAs', { org: invite.org_name, role: t(`role_${invite.role}`) })}</Txt>
-              </Animated.View>
+              </Rise>
             )}
           </Field>
         ) : (
