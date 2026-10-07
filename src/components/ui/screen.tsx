@@ -57,7 +57,8 @@ export function Screen({
       {headerExtra}
     </View>
   )
-  const pad: StyleProp<ViewStyle> = [{ paddingHorizontal: 20, paddingBottom: tabInset ? 130 : footer ? 24 : insets.bottom + 32 }, contentStyle]
+  // without a header bar the content itself must clear the status bar
+  const pad: StyleProp<ViewStyle> = [{ paddingHorizontal: 20, paddingTop: header ? 0 : insets.top + 12, paddingBottom: tabInset ? 130 : footer ? 24 : insets.bottom + 32 }, contentStyle]
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <Ambient />

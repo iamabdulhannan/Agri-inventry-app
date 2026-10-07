@@ -5,7 +5,7 @@ import {
   ActivityIndicator, Pressable, StyleSheet, Text, View,
   type GestureResponderEvent, type LayoutChangeEvent, type StyleProp, type TextProps, type TextStyle, type ViewStyle,
 } from 'react-native'
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withSpring, withTiming } from 'react-native-reanimated'
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated'
 import { useI18n } from '@/lib/i18n'
 import { fonts, radius, toneColors, useTheme, type Tone } from '@/lib/theme'
 
@@ -286,15 +286,28 @@ export function IconTile({ icon, tone = 'primary', size = 40 }: { icon: ReactNod
   return <View style={{ width: size, height: size, borderRadius: size * 0.32, backgroundColor: t.bg, alignItems: 'center', justifyContent: 'center' }}>{icon}</View>
 }
 
-/** fade+rise when mounted, staggered by index */
+/**
+ * Fade + rise when mounted, staggered by index.
+ * Once the animation has had time to finish, the animated style is dropped so the final look comes
+ * from plain React props. Android can rebuild native views (e.g. when you come back to a screen) and
+ * would otherwise restore Reanimated's starting style (invisible).
+ */
 export function Rise({ children, i = 0, style }: { children: ReactNode; i?: number; style?: StyleProp<ViewStyle> }) {
   const o = useSharedValue(0)
+  const [settled, setSettled] = useState(false)
   useEffect(() => {
-    o.set(withDelay(Math.min(i, 12) * 55, withTiming(1, { duration: 480, easing: Easing.out(Easing.cubic) })))
+    const delay = Math.min(i, 12) * 55
+    // stagger with a JS timer (Reanimated's withDelay could stall on Android)
+    const start = setTimeout(() => o.set(withTiming(1, { duration: 480, easing: Easing.out(Easing.cubic) })), delay)
+    const settle = setTimeout(() => setSettled(true), delay + 650)
+    return () => {
+      clearTimeout(start)
+      clearTimeout(settle)
+    }
   }, [o, i])
   const a = useAnimatedStyle(() => ({ opacity: o.value, transform: [{ translateY: (1 - o.value) * 18 }] }))
   // collapsable={false}: stays one stable native view, so text fields inside keep focus on Android
-  return <Animated.View collapsable={false} style={[style, a]}>{children}</Animated.View>
+  return <Animated.View collapsable={false} style={[style, !settled && a]}>{children}</Animated.View>
 }
 
 const styles = StyleSheet.create({

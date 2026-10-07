@@ -2,7 +2,7 @@ import { X } from 'lucide-react-native'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Dimensions, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler'
-import Animated, { Easing, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated'
+import Animated, { Easing, FadeIn, runOnJS, SlideInDown, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTheme } from '@/lib/theme'
 import { IconBtn, Txt } from './core'
@@ -26,21 +26,24 @@ export function Sheet({
   const { c } = useTheme()
   const insets = useSafeAreaInsets()
   const [mounted, setMounted] = useState(open)
-  const y = useSharedValue(H)
-  const fade = useSharedValue(0)
+  // y is only the drag / close offset: the sheet's resting place (on screen) comes from React props,
+  // so it shows even if Android drops a Reanimated update. Opening uses a mount animation (SlideInDown).
+  const y = useSharedValue(0)
+  const fade = useSharedValue(1)
 
   useEffect(() => {
     if (open) {
+      y.set(0)
+      fade.set(1)
       setMounted(true)
-      y.set(H)
-      y.set(withSpring(0, { damping: 22, stiffness: 210, mass: 0.9 }))
-      fade.set(withTiming(1, { duration: 240 }))
-    } else if (mounted) {
-      fade.set(withTiming(0, { duration: 200 }))
-      y.set(withTiming(H, { duration: 260, easing: Easing.in(Easing.cubic) }, (done) => {
-        if (done) runOnJS(setMounted)(false)
-      }))
+      return
     }
+    if (!mounted) return
+    fade.set(withTiming(0, { duration: 200 }))
+    y.set(withTiming(H, { duration: 260, easing: Easing.in(Easing.cubic) }))
+    // unmount on a timer rather than the animation callback, so a dropped animation can't leave an invisible sheet
+    const id = setTimeout(() => setMounted(false), 280)
+    return () => clearTimeout(id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
@@ -58,51 +61,64 @@ export function Sheet({
 
   if (!mounted) return null
   const body = (
-    <View style={{ paddingHorizontal: 20, paddingBottom: footer ? 12 : Math.max(insets.bottom, 16) + 8 }}>{children}</View>
+    // a full, non-scrolling sheet hands its height down so lists inside (flex: 1) get room
+    <View style={[{ paddingHorizontal: 20, paddingBottom: footer ? 12 : Math.max(insets.bottom, 16) + 8 }, full && !scroll && { flex: 1 }]}>{children}</View>
   )
   return (
     <Modal visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: c.overlay }, backdrop]}>
-          <Pressable style={{ flex: 1 }} onPress={onClose} />
+        <Animated.View entering={FadeIn.duration(240)} style={StyleSheet.absoluteFill}>
+          <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: c.overlay }, backdrop]}>
+            <Pressable style={{ flex: 1 }} onPress={onClose} />
+          </Animated.View>
         </Animated.View>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, justifyContent: 'flex-end' }} pointerEvents="box-none">
+        {/* Android already resizes the modal window for the keyboard; adjusting again pushed the sheet off screen */}
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} enabled={Platform.OS === 'ios'} style={{ flex: 1, justifyContent: 'flex-end' }} pointerEvents="box-none">
+          {/* outer: mount (slide-in) animation and size limits; inner: the drag offset. Kept apart as Reanimated asks. */}
           <Animated.View
-            style={[
-              {
-                backgroundColor: c.bgAlt, borderTopLeftRadius: 30, borderTopRightRadius: 30, maxHeight: H * 0.92,
-                borderWidth: 1, borderColor: c.border, borderBottomWidth: 0,
-              },
-              full && { height: H * 0.9 },
-              sheetStyle,
-            ]}
+            entering={SlideInDown.springify().damping(22).stiffness(210).mass(0.9)}
+            collapsable={false}
+            // fill the space above the keyboard instead of a fixed height, so the header and search stay on screen
+            style={full ? { flex: 1, marginTop: insets.top + 24 } : { maxHeight: '92%' }}
           >
-            <GestureDetector gesture={pan}>
-              <View style={{ paddingTop: 10, paddingBottom: 6, paddingHorizontal: 20 }}>
-                <View style={{ alignSelf: 'center', width: 44, height: 5, borderRadius: 3, backgroundColor: c.borderStrong, marginBottom: 12 }} />
-                {(!!title || !!subtitle) && (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-                    <View style={{ flex: 1 }}>
-                      {typeof title === 'string' ? <Txt v="h2">{title}</Txt> : title}
-                      {!!subtitle && <Txt v="small" muted style={{ marginTop: 2 }}>{subtitle}</Txt>}
+            <Animated.View
+              collapsable={false}
+              style={[
+                {
+                  backgroundColor: c.bgAlt, borderTopLeftRadius: 30, borderTopRightRadius: 30,
+                  borderWidth: 1, borderColor: c.border, borderBottomWidth: 0, flexShrink: 1,
+                },
+                full && { flex: 1 },
+                sheetStyle,
+              ]}
+            >
+              <GestureDetector gesture={pan}>
+                <View style={{ paddingTop: 10, paddingBottom: 6, paddingHorizontal: 20 }}>
+                  <View style={{ alignSelf: 'center', width: 44, height: 5, borderRadius: 3, backgroundColor: c.borderStrong, marginBottom: 12 }} />
+                  {(!!title || !!subtitle) && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+                      <View style={{ flex: 1 }}>
+                        {typeof title === 'string' ? <Txt v="h2">{title}</Txt> : title}
+                        {!!subtitle && <Txt v="small" muted style={{ marginTop: 2 }}>{subtitle}</Txt>}
+                      </View>
+                      <IconBtn size={36} icon={<X size={18} color={c.textSoft} />} onPress={onClose} label="close" />
                     </View>
-                    <IconBtn size={36} icon={<X size={18} color={c.textSoft} />} onPress={onClose} label="close" />
-                  </View>
-                )}
-              </View>
-            </GestureDetector>
-            {scroll ? (
-              <ScrollView keyboardShouldPersistTaps="handled" style={full ? { flex: 1 } : undefined} contentContainerStyle={{ paddingBottom: 8 }} showsVerticalScrollIndicator={false}>
-                {body}
-              </ScrollView>
-            ) : (
-              <View style={full ? { flex: 1 } : undefined}>{body}</View>
-            )}
-            {footer && (
-              <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 20, paddingTop: 12, paddingBottom: Math.max(insets.bottom, 14) + 4, borderTopWidth: 1, borderTopColor: c.border }}>
-                {footer}
-              </View>
-            )}
+                  )}
+                </View>
+              </GestureDetector>
+              {scroll ? (
+                <ScrollView keyboardShouldPersistTaps="handled" style={full ? { flex: 1 } : { flexShrink: 1 }} contentContainerStyle={{ paddingBottom: 8 }} showsVerticalScrollIndicator={false}>
+                  {body}
+                </ScrollView>
+              ) : (
+                <View style={full ? { flex: 1 } : undefined}>{body}</View>
+              )}
+              {footer && (
+                <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 20, paddingTop: 12, paddingBottom: Math.max(insets.bottom, 14) + 4, borderTopWidth: 1, borderTopColor: c.border }}>
+                  {footer}
+                </View>
+              )}
+            </Animated.View>
           </Animated.View>
         </KeyboardAvoidingView>
       </GestureHandlerRootView>

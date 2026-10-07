@@ -68,9 +68,20 @@ export function Splash({ ready, onDone }: { ready: boolean; onDone: () => void }
     exiting.current = true
     haptic.medium()
     bar.set(withTiming(1, { duration: 260 }))
-    exit.set(withDelay(220, withTiming(1, { duration: 750, easing: Easing.bezier(0.7, 0, 0.84, 0) }, (fin) => {
-      if (fin) runOnJS(onDone)()
-    })))
+    let finished = false
+    const done = () => {
+      if (finished) return
+      finished = true
+      onDone()
+    }
+    // timers are intentionally not cleared: once the exit has begun it must always finish
+    setTimeout(() => {
+      exit.set(withTiming(1, { duration: 750, easing: Easing.bezier(0.7, 0, 0.84, 0) }, (fin) => {
+        if (fin) runOnJS(done)()
+      }))
+    }, 220)
+    // never get stuck on the splash, even if the exit animation is dropped
+    setTimeout(done, 220 + 750 + 700)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, minDone])
 

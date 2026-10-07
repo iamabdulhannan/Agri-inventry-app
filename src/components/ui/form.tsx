@@ -1,5 +1,5 @@
 import { CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Eye, EyeOff, Minus, Plus, Search } from 'lucide-react-native'
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { FlatList, Pressable, TextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native'
 import { addDays, fmtDate, fmtMonth, isoOf } from '@/lib/format'
 import { useI18n } from '@/lib/i18n'
@@ -142,6 +142,9 @@ export function PickerSheet({
   const { c } = useTheme()
   const { t } = useI18n()
   const [q, setQ] = useState('')
+  useEffect(() => {
+    if (open) setQ('')
+  }, [open])
   const list = useMemo(() => {
     const terms = q.toLowerCase().split(/\s+/).filter(Boolean)
     return terms.length ? options.filter((o) => terms.every((x) => `${o.label} ${o.sub ?? ''}`.toLowerCase().includes(x))) : options

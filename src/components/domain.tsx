@@ -1,5 +1,5 @@
 import { ArrowDownLeft, ArrowUpRight, Droplets, FlaskConical, Package, Plus, Sprout, Wheat } from 'lucide-react-native'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { FlatList, Pressable, View } from 'react-native'
 import type { Catalog } from '@/lib/catalog'
 import { daysBetween, fmtDate, fmtDateTime } from '@/lib/format'
@@ -175,6 +175,13 @@ export function ProductPickerSheet({
   const label = usePackLabel()
   const [q, setQ] = useState('')
   const [cat, setCat] = useState('all')
+  // start clean every time: a leftover search would hide products
+  useEffect(() => {
+    if (open) {
+      setQ('')
+      setCat('all')
+    }
+  }, [open])
   const list = useMemo(() => {
     const terms = q.toLowerCase().split(/\s+/).filter(Boolean)
     return catalog.products
@@ -210,7 +217,7 @@ export function ProductPickerSheet({
             <Txt weight="bold" color={c.primary}>{t('newProduct')}</Txt>
           </Pressable>
         ) : null}
-        ListEmptyComponent={<Txt muted align="center" style={{ padding: 30 }}>{t('noProducts')}</Txt>}
+        ListEmptyComponent={<Txt muted align="center" style={{ padding: 30 }}>{q || cat !== 'all' ? t('noData') : t('noProducts')}</Txt>}
         renderItem={({ item: p }) => {
           const tone = toneColors(c, stockTone(p))
           const price = priceKind === 'sale' ? p.sale_price : p.purchase_price
@@ -257,6 +264,9 @@ export function PartyPickerSheet({
   const { t } = useI18n()
   const { c } = useTheme()
   const [q, setQ] = useState('')
+  useEffect(() => {
+    if (open) setQ('')
+  }, [open])
   const list = useMemo(() => {
     const terms = q.toLowerCase().split(/\s+/).filter(Boolean)
     return parties.filter((p) => p.is_active || p.id === value).filter((p) => terms.every((x) => `${p.name} ${p.phone ?? ''}`.toLowerCase().includes(x)))
