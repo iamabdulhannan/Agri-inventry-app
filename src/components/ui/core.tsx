@@ -2,10 +2,11 @@ import * as Haptics from 'expo-haptics'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useEffect, useState, type ReactNode } from 'react'
 import {
+  Animated as RNAnimated, Easing as RNEasing,
   ActivityIndicator, Pressable, StyleSheet, Text, View,
   type GestureResponderEvent, type LayoutChangeEvent, type StyleProp, type TextProps, type TextStyle, type ViewStyle,
 } from 'react-native'
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated'
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated'
 import { useI18n } from '@/lib/i18n'
 import { fonts, radius, toneColors, useTheme, type Tone } from '@/lib/theme'
 
@@ -288,27 +289,30 @@ export function IconTile({ icon, tone = 'primary', size = 40 }: { icon: ReactNod
 
 /**
  * Fade + rise when mounted, staggered by index.
- * Once the animation has had time to finish, the animated style is dropped so the final look comes
- * from plain React props. Android can rebuild native views (e.g. when you come back to a screen) and
- * would otherwise restore Reanimated's starting style (invisible).
+ * Uses React Native's built-in Animated (native driver), not Reanimated: on some Android phones a
+ * Reanimated fade could stop half way and stay faded. When the animation ends (or after a safety
+ * timeout) the view gets an explicit opacity 1 / no offset, which overrides anything left over.
  */
 export function Rise({ children, i = 0, style }: { children: ReactNode; i?: number; style?: StyleProp<ViewStyle> }) {
-  const o = useSharedValue(0)
-  const [settled, setSettled] = useState(false)
+  const [v] = useState(() => new RNAnimated.Value(0))
+  const [done, setDone] = useState(false)
   useEffect(() => {
     const delay = Math.min(i, 12) * 55
-    // stagger with a JS timer (Reanimated's withDelay could stall on Android)
-    const start = setTimeout(() => o.set(withTiming(1, { duration: 480, easing: Easing.out(Easing.cubic) })), delay)
-    const settle = setTimeout(() => setSettled(true), delay + 650)
+    const anim = RNAnimated.timing(v, { toValue: 1, duration: 450, delay, easing: RNEasing.out(RNEasing.cubic), useNativeDriver: true })
+    anim.start(() => setDone(true))
+    const safety = setTimeout(() => setDone(true), delay + 1000)
     return () => {
-      clearTimeout(start)
-      clearTimeout(settle)
+      anim.stop()
+      clearTimeout(safety)
     }
-  }, [o, i])
-  const a = useAnimatedStyle(() => ({ opacity: o.value, transform: [{ translateY: (1 - o.value) * 18 }] }))
+  }, [v, i])
+  const motion = done
+    ? RISE_DONE
+    : { opacity: v, transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }] }
   // collapsable={false}: stays one stable native view, so text fields inside keep focus on Android
-  return <Animated.View collapsable={false} style={[style, !settled && a]}>{children}</Animated.View>
+  return <RNAnimated.View collapsable={false} style={[style, motion]}>{children}</RNAnimated.View>
 }
+const RISE_DONE = { opacity: 1, transform: [{ translateY: 0 }] }
 
 const styles = StyleSheet.create({
   btnInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },

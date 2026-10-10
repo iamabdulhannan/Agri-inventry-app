@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
-import { View } from 'react-native'
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated'
+import { Animated, Easing, View } from 'react-native'
 import { Txt } from './ui'
 
 /** Bars that grow in one after another */
@@ -35,43 +34,48 @@ export function Bars({
   )
 }
 
+// Bars and meters use React Native's built-in Animated (see Rise in ui/core for why not Reanimated).
+// When the animation ends (or after a safety timeout) they get their final size as a plain value.
+
 function Bar({ h, i, color, width }: { h: number; i: number; color: string; width?: number }) {
-  const v = useSharedValue(0)
   const target = Math.max(4, h)
-  const [settled, setSettled] = useState(false)
+  const [v] = useState(() => new Animated.Value(0))
+  const [done, setDone] = useState(false)
   useEffect(() => {
-    setSettled(false)
-    v.set(0)
-    const start = setTimeout(() => v.set(withTiming(target, { duration: 700, easing: Easing.out(Easing.back(1.4)) })), 250 + i * 70)
-    // then hand the final height to React (see Rise in ui/core for why)
-    const settle = setTimeout(() => setSettled(true), 250 + i * 70 + 900)
+    setDone(false)
+    v.setValue(0)
+    const delay = 250 + i * 70
+    const anim = Animated.timing(v, { toValue: target, duration: 650, delay, easing: Easing.out(Easing.back(1.3)), useNativeDriver: false })
+    anim.start(() => setDone(true))
+    const safety = setTimeout(() => setDone(true), delay + 1000)
     return () => {
-      clearTimeout(start)
-      clearTimeout(settle)
+      anim.stop()
+      clearTimeout(safety)
     }
   }, [target, i, v])
-  const s = useAnimatedStyle(() => ({ height: v.value }))
-  return <Animated.View style={[{ flex: width ? undefined : 1, width, borderRadius: 6, backgroundColor: color }, settled ? { height: target } : s]} />
+  return <Animated.View style={{ flex: width ? undefined : 1, width, borderRadius: 6, backgroundColor: color, height: done ? target : v }} />
 }
 
 /** Horizontal progress bar that fills in */
 export function Meter({ value, color, track, height = 8, delay = 200 }: { value: number; color: string; track: string; height?: number; delay?: number }) {
-  const v = useSharedValue(0)
   const target = Math.max(0, Math.min(1, value))
-  const [settled, setSettled] = useState(false)
+  const [v] = useState(() => new Animated.Value(0))
+  const [done, setDone] = useState(false)
   useEffect(() => {
-    setSettled(false)
-    const start = setTimeout(() => v.set(withTiming(target, { duration: 800, easing: Easing.out(Easing.cubic) })), delay)
-    const settle = setTimeout(() => setSettled(true), delay + 1000)
+    setDone(false)
+    v.setValue(0)
+    const anim = Animated.timing(v, { toValue: target, duration: 750, delay, easing: Easing.out(Easing.cubic), useNativeDriver: false })
+    anim.start(() => setDone(true))
+    const safety = setTimeout(() => setDone(true), delay + 1100)
     return () => {
-      clearTimeout(start)
-      clearTimeout(settle)
+      anim.stop()
+      clearTimeout(safety)
     }
   }, [target, v, delay])
-  const s = useAnimatedStyle(() => ({ width: `${v.value * 100}%` }))
+  const width = done ? `${target * 100}%` : v.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] })
   return (
     <View style={{ height, borderRadius: height / 2, backgroundColor: track, overflow: 'hidden' }}>
-      <Animated.View style={[{ height, borderRadius: height / 2, backgroundColor: color }, settled ? { width: `${target * 100}%` } : s]} />
+      <Animated.View style={{ height, borderRadius: height / 2, backgroundColor: color, width: width as `${number}%` }} />
     </View>
   )
 }
