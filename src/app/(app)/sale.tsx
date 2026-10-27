@@ -12,7 +12,7 @@ import { useLoad } from '@/lib/data'
 import { errText } from '@/lib/errors'
 import { daysBetween, fmtDate } from '@/lib/format'
 import { useI18n } from '@/lib/i18n'
-import { canSellLoose, kgFits, kgStep, kgToPacks, packsToKg, perKg, perPack, type SaleUnit } from '@/lib/loose'
+import { canSellLoose, exceeds, kgFits, kgToPacks, packsToKg, perKg, perPack, type SaleUnit } from '@/lib/loose'
 import { fmtMoney, r2 } from '@/lib/money'
 import { supabase } from '@/lib/supabase'
 import { useTheme } from '@/lib/theme'
@@ -115,7 +115,7 @@ export default function Sale() {
     if (!lines.length) return setErr(t('errChooseProduct'))
     for (const l of lines) {
       if (!(Number(l.qty) > 0)) return setErr(t('errQty'))
-      if (looseOf(l) && !kgFits(Number(l.qty), sizeOf(l))) return setErr(t('errKgStep', { size: fmtNum(sizeOf(l)), step: fmtNum(kgStep(sizeOf(l)), 3) }))
+      if (looseOf(l) && !kgFits(Number(l.qty))) return setErr(t('errKgStep'))
       if (isSale && !(Number(l.rate) >= 0 && l.rate !== '')) return setErr(t('errInvalidPrice'))
     }
     if (isSale) {
@@ -233,8 +233,8 @@ export default function Sale() {
           const loose = looseOf(l)
           const size = Number(p.pack_size) || 1
           const qty = packsOf(l)
-          const over = qty > available
-          const badStep = loose && Number(l.qty) > 0 && !kgFits(Number(l.qty), size)
+          const over = exceeds(qty, available)
+          const badStep = loose && Number(l.qty) > 0 && !kgFits(Number(l.qty))
           const kg = unitLabel('kg', lang)
           const plan: { b: BatchStock; take: number }[] = []
           if (qty > 0 && !over) {
@@ -283,7 +283,7 @@ export default function Sale() {
                   {over
                     ? `${t('exceeds')} (${loose ? `${fmtNum(packsToKg(available, size), 3)} ${kg}` : fmtNum(available, 3)})`
                     : badStep
-                      ? t('errKgStep', { size: fmtNum(size), step: fmtNum(kgStep(size), 3) })
+                      ? t('errKgStep')
                       : `${t('available')}: ${loose ? `${fmtNum(packsToKg(available, size), 3)} ${kg}` : fmtNum(available, 3)}${!loose && p.pack_unit !== 'pcs' ? ` = ${fmtTotal(available, p.pack_size, p.pack_unit, lang)}` : ''}`}
                 </Txt>
 

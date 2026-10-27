@@ -9,7 +9,7 @@ import { useCatalog } from '@/lib/catalog'
 import { errText } from '@/lib/errors'
 import { fmtDate } from '@/lib/format'
 import { useI18n } from '@/lib/i18n'
-import { kgFits, kgStep, kgToPacks, packsToKg } from '@/lib/loose'
+import { exceeds, kgFits, kgToPacks, packsToKg } from '@/lib/loose'
 import { fmtMoney, r2 } from '@/lib/money'
 import { supabase } from '@/lib/supabase'
 import { useTheme } from '@/lib/theme'
@@ -106,8 +106,8 @@ export default function InvoiceReturn() {
     setError('')
     for (const l of lines) {
       const q = packsOf(l)
-      if (q < 0 || q > l.remaining) return setError(`${t('errReturnTooMuch')} (${l.batch_no}: ${fmtNum(shown(l, l.remaining), 3)})`)
-      if (l.loose && !kgFits(Number(qty[l.batch_id]) || 0, sizeOf(l))) return setError(t('errKgStep', { size: fmtNum(sizeOf(l)), step: fmtNum(kgStep(sizeOf(l)), 3) }))
+      if (q < 0 || exceeds(q, l.remaining)) return setError(`${t('errReturnTooMuch')} (${l.batch_no}: ${fmtNum(shown(l, l.remaining), 3)})`)
+      if (l.loose && !kgFits(Number(qty[l.batch_id]) || 0)) return setError(t('errKgStep'))
     }
     if (!(value > 0)) return setError(t('errQty'))
     if (refundNum < 0 || refundNum > value) return setError(t('errInvalidRefund'))
@@ -116,7 +116,7 @@ export default function InvoiceReturn() {
       p_org: org.id,
       p_sale: sale.id,
       p_date: date,
-      p_lines: lines.filter((l) => packsOf(l) > 0).map((l) => ({ batch_id: l.batch_id, qty: packsOf(l) })),
+      p_lines: lines.filter((l) => packsOf(l) > 0).map((l) => ({ batch_id: l.batch_id, qty: Math.min(packsOf(l), l.remaining) })),
       p_refund: refundNum,
       p_note: note || null,
     })
@@ -158,7 +158,7 @@ export default function InvoiceReturn() {
           {lines.map((l, i) => {
             const p = catalog.byId.get(l.product_id)
             const kg = unitLabel('kg', lang)
-            const over = packsOf(l) > l.remaining
+            const over = exceeds(packsOf(l), l.remaining)
             return (
               <Rise key={l.batch_id} i={i}>
                 <Card style={{ padding: 14, gap: 10, opacity: l.remaining > 0 ? 1 : 0.5 }} glow={over ? 'red' : undefined}>
