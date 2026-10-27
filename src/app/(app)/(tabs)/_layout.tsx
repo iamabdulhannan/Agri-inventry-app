@@ -4,11 +4,11 @@ import { Tabs, type BottomTabBarProps } from 'expo-router/js-tabs'
 import { LinearGradient } from 'expo-linear-gradient'
 import { BookUser, House, LayoutGrid, Package, ScanBarcode } from 'lucide-react-native'
 import { useEffect, useState } from 'react'
-import { Platform, Pressable, StyleSheet, View } from 'react-native'
-import Animated, { Easing, interpolate, useAnimatedStyle, useSharedValue, withRepeat, withSpring, withTiming } from 'react-native-reanimated'
+import { Animated, Platform, Pressable, StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { haptic, PressScale, Txt } from '@/components/ui'
 import { useI18n } from '@/lib/i18n'
+import { softShadow, useLayout } from '@/lib/responsive'
 import { useTheme } from '@/lib/theme'
 
 export default function TabsLayout() {
@@ -33,17 +33,12 @@ function TabBar({ state, navigation }: BottomTabBarProps) {
   // 5 slots: 2 tabs, the sell button, 2 tabs
   const slot = w / 5
   const slotOf = (i: number) => (i < 2 ? i : i + 1)
-  const x = useSharedValue(0)
+  const { width, isTablet } = useLayout()
+  // native-driver spring: always lands on the selected tab
+  const [x] = useState(() => new Animated.Value(0))
   useEffect(() => {
-    x.set(withSpring(slotOf(state.index) * slot, { damping: 16, stiffness: 180 }))
+    Animated.spring(x, { toValue: slotOf(state.index) * slot, useNativeDriver: true, damping: 16, stiffness: 180, mass: 1 }).start()
   }, [state.index, slot, x])
-  const indicator = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }))
-
-  const pulse = useSharedValue(0)
-  useEffect(() => {
-    pulse.set(withRepeat(withTiming(1, { duration: 2200, easing: Easing.out(Easing.quad) }), -1, false))
-  }, [pulse])
-  const halo = useAnimatedStyle(() => ({ opacity: interpolate(pulse.value, [0, 1], [0.55, 0]), transform: [{ scale: interpolate(pulse.value, [0, 1], [1, 1.6]) }] }))
 
   const tab = (route: (typeof state.routes)[number], i: number) => {
     const focused = state.index === i
@@ -67,14 +62,17 @@ function TabBar({ state, navigation }: BottomTabBarProps) {
   }
 
   return (
-    <View pointerEvents="box-none" style={[styles.wrap, { bottom: Math.max(insets.bottom, 12) }]}>
-      <View style={[styles.bar, { borderColor: c.borderStrong, shadowColor: c.dark ? '#000' : c.shadow }]} onLayout={(e) => setW(e.nativeEvent.layout.width)}>
+    <View
+      pointerEvents="box-none"
+      style={[styles.wrap, { bottom: Math.max(insets.bottom, 12) }, isTablet && { left: (width - 520) / 2, right: (width - 520) / 2 }]}
+    >
+      <View style={[styles.bar, { borderColor: c.borderStrong }, softShadow(c.dark ? '#000' : c.shadow, 0.3, 20, 8)]} onLayout={(e) => setW(e.nativeEvent.layout.width)}>
         {Platform.OS === 'ios' ? (
           <BlurView intensity={60} tint={c.dark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
         ) : null}
         <View style={[StyleSheet.absoluteFill, { backgroundColor: Platform.OS === 'ios' ? c.tabBar : c.dark ? '#0E2016' : '#FFFFFF' }]} />
         {w > 0 && (
-          <Animated.View style={[styles.indicatorSlot, { width: slot }, indicator]}>
+          <Animated.View style={[styles.indicatorSlot, { width: slot, transform: [{ translateX: x }] }]}>
             <View style={[styles.indicator, { backgroundColor: c.primarySoft }]} />
           </Animated.View>
         )}
@@ -85,8 +83,9 @@ function TabBar({ state, navigation }: BottomTabBarProps) {
 
       {/* center sell button */}
       <View pointerEvents="box-none" style={styles.fabWrap}>
-        <Animated.View style={[styles.halo, { borderColor: c.primary }, halo]} />
-        <PressScale onPress={() => { haptic.medium(); router.push('/sale') }} hapticOnPress={false} scaleTo={0.9} style={[styles.fab, { shadowColor: c.primary }]}>
+        {/* crisp ring that cuts the button out of the bar */}
+        <View style={[styles.ring, { backgroundColor: c.bg, borderColor: c.borderStrong }]} />
+        <PressScale onPress={() => { haptic.medium(); router.push('/sale') }} hapticOnPress={false} scaleTo={0.92} style={[styles.fab, softShadow(c.primary, 0.45, 14, 4)]}>
           <LinearGradient colors={c.dark ? ['#E1FF7A', '#9BE22F'] : ['#22C55E', '#15803D']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.fabInner}>
             <ScanBarcode size={26} color={c.primaryText} strokeWidth={2.4} />
           </LinearGradient>
@@ -101,13 +100,12 @@ const styles = StyleSheet.create({
   wrap: { position: 'absolute', left: 14, right: 14 },
   bar: {
     flexDirection: 'row', height: 68, borderRadius: 26, overflow: 'hidden', borderWidth: 1,
-    shadowOpacity: 0.35, shadowRadius: 24, shadowOffset: { width: 0, height: 10 }, elevation: 14,
   },
   tab: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   indicatorSlot: { position: 'absolute', top: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center' },
   indicator: { width: 58, height: 52, borderRadius: 18 },
   fabWrap: { position: 'absolute', left: 0, right: 0, top: -26, alignItems: 'center' },
-  fab: { width: 64, height: 64, borderRadius: 24, shadowOpacity: 0.6, shadowRadius: 18, shadowOffset: { width: 0, height: 6 }, elevation: 16 },
+  fab: { width: 64, height: 64, borderRadius: 24 },
   fabInner: { flex: 1, borderRadius: 24, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: 'rgba(255,255,255,0.25)' },
-  halo: { position: 'absolute', top: 0, width: 64, height: 64, borderRadius: 24, borderWidth: 2 },
+  ring: { position: 'absolute', top: -6, width: 76, height: 76, borderRadius: 29, borderWidth: 1 },
 })

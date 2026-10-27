@@ -1,9 +1,9 @@
 import { router } from 'expo-router'
 import { History as HistoryIcon, Trash2 } from 'lucide-react-native'
 import { useMemo, useState } from 'react'
-import { ScrollView, View } from 'react-native'
+import { View } from 'react-native'
 import { MovementRow } from '@/components/domain'
-import { Card, Chip, DateField, Empty, ErrorBox, Loading, PressScale, Row, Screen, SearchBar, Txt, useFeedback } from '@/components/ui'
+import { Card, Chip, DateField, Empty, ErrorBox, Loading, PressScale, Row, Screen, SearchBar, Txt, useFeedback, HScroll } from '@/components/ui'
 import { useOrg } from '@/lib/app'
 import { loadCatalog } from '@/lib/catalog'
 import { fetchAll, useLoad } from '@/lib/data'
@@ -83,10 +83,10 @@ export default function History() {
         <View style={{ flex: 1 }}><DateField value={to} onChange={setTo} max={today} min={from} label={t('to')} /></View>
       </Row>
       <SearchBar value={q} onChangeText={setQ} style={{ marginTop: 10 }} />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20, marginTop: 10, flexGrow: 0 }} contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}>
+      <HScroll gap={8} style={{ marginTop: 10 }}>
         <Chip label={t('allTypes')} active={type === ''} onPress={() => setType('')} />
         {ALL_TYPES.map((x) => <Chip key={x} label={t(`mv_${x}`)} active={type === x} onPress={() => setType(x)} />)}
-      </ScrollView>
+      </HScroll>
       <View style={{ marginTop: 14, gap: 14 }}>
         {loading && !data ? <Loading rows={6} /> : error && !data ? <ErrorBox error={error} onRetry={reload} /> : groups.length === 0 ? (
           <Empty icon={<HistoryIcon size={30} color={c.muted} />}>{t('noEntries')}</Empty>

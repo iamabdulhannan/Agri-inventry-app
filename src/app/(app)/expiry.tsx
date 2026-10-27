@@ -1,9 +1,9 @@
 import { router } from 'expo-router'
 import { CalendarCheck2, PackageX } from 'lucide-react-native'
 import { useMemo, useState } from 'react'
-import { ScrollView, View } from 'react-native'
+import { View } from 'react-native'
 import { ProductAvatar, usePackLabel } from '@/components/domain'
-import { Button, Card, Chip, Empty, ErrorBox, Loading, Row, Screen, Txt } from '@/components/ui'
+import { Button, Card, Chip, Empty, ErrorBox, Loading, Row, Screen, Txt, HScroll } from '@/components/ui'
 import { useOrg } from '@/lib/app'
 import { loadBatches, loadCatalog } from '@/lib/catalog'
 import { useLoad } from '@/lib/data'
@@ -44,12 +44,12 @@ export default function Expiry() {
 
   return (
     <Screen back title={t('navExpiry')} subtitle={t('expiryReport')} refreshing={loading} onRefresh={reload}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20, flexGrow: 0 }} contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}>
+      <HScroll gap={8}>
         <Chip label={t('withinN', { n: org.expiry_alert_days })} active={f === 'alert'} onPress={() => setF('alert')} count={counts.alert} />
         <Chip label={t('expired')} active={f === 'expired'} onPress={() => setF('expired')} count={counts.expired} />
         <Chip label={t('within30')} active={f === '30'} onPress={() => setF('30')} count={counts['30']} />
         <Chip label={t('allBatches')} active={f === 'all'} onPress={() => setF('all')} count={counts.all} />
-      </ScrollView>
+      </HScroll>
       <View style={{ gap: 10, marginTop: 14 }}>
         {loading && !data ? <Loading rows={5} /> : error && !data ? <ErrorBox error={error} onRetry={reload} /> : rows.length === 0 ? (
           <Empty icon={<CalendarCheck2 size={30} color={c.green} />}>{t('noExpiry', { d: org.expiry_alert_days })}</Empty>

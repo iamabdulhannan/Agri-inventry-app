@@ -4,7 +4,6 @@ import * as Sharing from 'expo-sharing'
 import { CheckCircle2, Plus, Printer, Share2, X } from 'lucide-react-native'
 import { useEffect, useState } from 'react'
 import { ScrollView, StyleSheet, View } from 'react-native'
-import Animated, { FadeInDown, ZoomIn } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Button, ErrorBox, IconBtn, Loading, Row, Segmented, Txt, haptic, useFeedback } from '@/components/ui'
 import { useOrg } from '@/lib/app'
@@ -77,16 +76,16 @@ export default function Receipt() {
         {loading && !data ? <Loading rows={3} /> : error ? <ErrorBox error={error} onRetry={reload} /> : data && (
           <>
             {fresh && (
-              <Animated.View entering={ZoomIn.springify().damping(12)} style={{ alignItems: 'center', marginBottom: 16 }}>
+              <View style={{ alignItems: 'center', marginBottom: 16 }}>
                 <View style={[styles.okRing, { borderColor: c.primary + '55', backgroundColor: c.primarySoft }]}>
                   <CheckCircle2 size={42} color={c.primary} />
                 </View>
                 <Txt v="h2" style={{ marginTop: 10 }}>{fmtMoney(data.sale.total, lang)}</Txt>
                 <Txt v="small" muted>{t('saleSaved', { n: data.sale.invoice_no })}</Txt>
-              </Animated.View>
+              </View>
             )}
 
-            <Animated.View entering={FadeInDown.delay(fresh ? 250 : 0).springify().damping(16)}>
+            <View>
               <Zigzag top />
               <View style={styles.paper}>
                 <Txt v="h2" color={INK} align="center">{org.name}</Txt>
@@ -127,7 +126,7 @@ export default function Receipt() {
                 <Txt v="small" weight="extrabold" color={INK} align="center" style={{ marginTop: 4 }}>{t('thankYou')}</Txt>
               </View>
               <Zigzag />
-            </Animated.View>
+            </View>
 
             <Segmented
               value={paper}

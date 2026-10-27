@@ -4,10 +4,10 @@ import {
   AlertTriangle, ArrowDownToLine, BellRing, CheckCircle2, ChevronRight, Droplets, HandCoins, Landmark, NotebookPen,
   Package, ReceiptText, ScanBarcode, TrendingDown, TrendingUp, Wallet, Weight,
 } from 'lucide-react-native'
-import { ScrollView, StyleSheet, View } from 'react-native'
+import { StyleSheet, View } from 'react-native'
 import { Bars } from '@/components/charts'
 import { MovementRow, ProductAvatar, ProductRow, usePackLabel } from '@/components/domain'
-import { AnimatedNumber, Badge, Card, Empty, ErrorBox, IconTile, Loading, PressScale, Rise, Row, Screen, SectionTitle, StatTile, Txt } from '@/components/ui'
+import { AnimatedNumber, Badge, Card, Empty, ErrorBox, Grid, IconTile, Loading, PressScale, Rise, Row, Screen, SectionTitle, StatTile, Txt, HScroll } from '@/components/ui'
 import { useOrg } from '@/lib/app'
 import { loadCatalog } from '@/lib/catalog'
 import { useLoad } from '@/lib/data'
@@ -162,7 +162,7 @@ export default function Home() {
               {expired.length > 0 && <Badge tone="red" icon={<AlertTriangle size={11} color={c.red} />}>{t('expiredCount', { n: expired.length })}</Badge>}
               {alerts.length - expired.length > 0 && <Badge tone="amber">{t('expiringCount', { n: alerts.length - expired.length, d: org.expiry_alert_days })}</Badge>}
             </Row>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingRight: 20 }} style={{ marginHorizontal: -20, paddingLeft: 20 }}>
+            <HScroll gap={10}>
               {alerts.slice(0, 10).map((a) => {
                 const bad = a.days_left < 0
                 const tc = toneColors(c, bad ? 'red' : 'amber')
@@ -183,7 +183,7 @@ export default function Home() {
                   </PressScale>
                 )
               })}
-            </ScrollView>
+            </HScroll>
           </>
         )}
       </Rise>
@@ -192,18 +192,14 @@ export default function Home() {
       {money && (
         <Rise i={3}>
           <SectionTitle>{t('money')}</SectionTitle>
-          <View style={styles.grid}>
+          <Grid>
             <StatTile icon={<Wallet size={18} color={c.primary} />} label={t('cashInHand')} value={money.cash_in_hand} format={m} onPress={() => router.push('/roznamcha')} />
             <StatTile icon={<TrendingUp size={18} color={c.green} />} tone="green" label={t('monthSales')} value={money.month_sales} format={m} sub={`${t('profit')}: ${m(money.month_profit)}`} onPress={() => router.push('/reports')} />
-          </View>
-          <View style={[styles.grid, { marginTop: 10 }]}>
             <StatTile icon={<HandCoins size={18} color={c.amber} />} tone="amber" label={t('totalReceivable')} value={money.receivable} format={m} onPress={() => router.push({ pathname: '/khata', params: { kind: 'customer' } })} />
             <StatTile icon={<Landmark size={18} color={c.red} />} tone="red" label={t('totalPayable')} value={money.payable} format={m} onPress={() => router.push({ pathname: '/khata', params: { kind: 'supplier' } })} />
-          </View>
-          <View style={[styles.grid, { marginTop: 10 }]}>
             <StatTile icon={<Package size={18} color={c.blue} />} tone="blue" label={t('stockValue')} value={money.stock_value} format={m} onPress={() => router.push('/products')} />
             <StatTile icon={<ReceiptText size={18} color={c.violet} />} tone="violet" label={t('todayExpenses')} value={money.today_expenses} format={m} onPress={() => router.push('/roznamcha')} />
-          </View>
+          </Grid>
         </Rise>
       )}
 
@@ -261,13 +257,12 @@ export default function Home() {
 const styles = StyleSheet.create({
   bell: { width: 46, height: 46, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   dot: { position: 'absolute', top: -4, right: -4, minWidth: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, borderWidth: 2 },
-  heroShell: { borderRadius: 30, overflow: 'hidden', shadowColor: '#0F5132', shadowOpacity: 0.5, shadowRadius: 24, shadowOffset: { width: 0, height: 12 }, elevation: 10 },
+  heroShell: { borderRadius: 30, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(200,255,77,0.18)' },
   hero: { padding: 20, borderRadius: 30, overflow: 'hidden' },
   heroBlob: { position: 'absolute', width: 220, height: 220, borderRadius: 110 },
   heroChip: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.22)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 99 },
   action: { flex: 1, alignItems: 'center', paddingVertical: 14, paddingHorizontal: 4, borderRadius: 22, borderWidth: 1 },
   actionIcon: { width: 46, height: 46, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   expCard: { width: 190, padding: 14, borderRadius: 22, borderWidth: 1 },
-  grid: { flexDirection: 'row', gap: 10 },
   reportLink: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 20, borderWidth: 1, marginTop: 12 },
 })

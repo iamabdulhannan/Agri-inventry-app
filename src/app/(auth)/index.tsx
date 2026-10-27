@@ -3,7 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { BarChart3, BookUser, CalendarClock, Languages, Receipt, ScanLine, Ticket } from 'lucide-react-native'
 import { useEffect } from 'react'
 import { Dimensions, Pressable, StyleSheet, View } from 'react-native'
-import Animated, { Easing, FadeInDown, interpolate, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated'
+import Animated, { Easing, interpolate, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LogoBadge } from '@/components/Logo'
 import { Button, Row, Txt } from '@/components/ui'
@@ -79,11 +79,11 @@ export default function Welcome() {
       </View>
 
       <View style={{ flex: 1, justifyContent: 'flex-end', paddingHorizontal: 22, paddingBottom: insets.bottom + 18 }}>
-        <Animated.View entering={FadeInDown.delay(150).duration(600)}>
+        <View>
           <Txt v="display" color="#F2FFF5" style={{ fontSize: 38, lineHeight: 44 }}>{t('welcomeTitle')}</Txt>
           <Txt color="rgba(236,247,239,0.65)" style={{ marginTop: 10 }}>{t('welcomeText')}</Txt>
-        </Animated.View>
-        <Animated.View entering={FadeInDown.delay(280).duration(600)}>
+        </View>
+        <View>
           <Row gap={8} style={{ flexWrap: 'wrap', marginTop: 18 }}>
             {feats.map(({ icon: Icon, label, color }) => (
               <View key={label} style={styles.pill}>
@@ -92,16 +92,16 @@ export default function Welcome() {
               </View>
             ))}
           </Row>
-        </Animated.View>
+        </View>
         {removed && <Txt v="small" color="#FBBF24" style={{ marginTop: 14 }}>{t('removedBanner')}</Txt>}
         {!supabaseConfigured && <Txt v="small" color="#FB7185" style={{ marginTop: 14 }}>{t('errNotConfigured')}</Txt>}
-        <Animated.View entering={FadeInDown.delay(400).duration(600)} style={{ gap: 10, marginTop: 24 }}>
-          <Button size="lg" title={t('createOrgBtn')} onPress={() => router.push({ pathname: '/sign-up', params: { mode: 'create' } })} style={{ shadowColor: '#C8FF4D', shadowOpacity: 0.5, shadowRadius: 18 }} />
+        <View style={{ gap: 10, marginTop: 24 }}>
+          <Button size="lg" title={t('createOrgBtn')} onPress={() => router.push({ pathname: '/sign-up', params: { mode: 'create' } })}  />
           <Row gap={10}>
             <Button size="lg" variant="outline" color="#F2FFF5" title={t('signIn')} onPress={() => router.push('/sign-in')} style={{ flex: 1, borderColor: 'rgba(236,247,239,0.25)' }} />
             <Button size="lg" variant="outline" icon={<Ticket size={18} color="#C8FF4D" />} color="#F2FFF5" title={t('joinOrg')} onPress={() => router.push({ pathname: '/sign-up', params: { mode: 'join' } })} style={{ flex: 1.5, borderColor: 'rgba(236,247,239,0.25)' }} />
           </Row>
-        </Animated.View>
+        </View>
       </View>
     </View>
   )
@@ -113,7 +113,6 @@ const styles = StyleSheet.create({
   floatCard: {
     position: 'absolute', flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, paddingRight: 18, borderRadius: 22,
     backgroundColor: 'rgba(16,40,26,0.85)', borderWidth: 1, borderColor: 'rgba(200,255,77,0.18)',
-    shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 24, shadowOffset: { width: 0, height: 12 }, elevation: 8,
   },
   dot: { width: 38, height: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   pill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 11, paddingVertical: 7, borderRadius: 99, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },

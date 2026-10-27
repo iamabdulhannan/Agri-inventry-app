@@ -7,6 +7,7 @@ import { BalanceAmount, PartyAvatar } from '@/components/domain'
 import { PartyFormSheet } from '@/components/forms'
 import { Ambient, AnimatedNumber, Empty, ErrorBox, IconBtn, Loading, PressScale, Row, SearchBar, Txt, haptic } from '@/components/ui'
 import { useOrg } from '@/lib/app'
+import { useLayout } from '@/lib/responsive'
 import { loadParties } from '@/lib/catalog'
 import { useLoad } from '@/lib/data'
 import { fmtDate } from '@/lib/format'
@@ -19,6 +20,8 @@ export default function Khata() {
   const { t, lang } = useI18n()
   const { c } = useTheme()
   const insets = useSafeAreaInsets()
+  const { width, contentWidth } = useLayout()
+  const side = (width - contentWidth) / 2
   const { org, version, refresh } = useOrg()
   const params = useLocalSearchParams<{ kind?: string }>()
   const [kind, setKind] = useState<PartyKind>(params.kind === 'supplier' ? 'supplier' : 'customer')
@@ -40,7 +43,7 @@ export default function Khata() {
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <Ambient />
-      <View style={{ paddingTop: insets.top + 8, paddingHorizontal: 20 }}>
+      <View style={{ paddingTop: insets.top + 8, paddingHorizontal: side }}>
         <Row between>
           <Txt v="h1">{t('navKhata')}</Txt>
           <IconBtn icon={<Plus size={20} color={c.primaryText} />} onPress={() => setAdding(true)} style={{ backgroundColor: c.primary, borderWidth: 0 }} label={kind === 'customer' ? t('addCustomer') : t('addSupplier')} />
@@ -52,14 +55,14 @@ export default function Khata() {
         <SearchBar value={q} onChangeText={setQ} style={{ marginTop: 12 }} />
       </View>
       {loading && !data ? (
-        <View style={{ padding: 20 }}><Loading /></View>
+        <View style={{ paddingHorizontal: side, paddingVertical: 20 }}><Loading /></View>
       ) : error && !data ? (
-        <View style={{ padding: 20 }}><ErrorBox error={error} onRetry={reload} /></View>
+        <View style={{ paddingHorizontal: side, paddingVertical: 20 }}><ErrorBox error={error} onRetry={reload} /></View>
       ) : (
         <FlatList
           data={list}
           keyExtractor={(p) => p.id}
-          contentContainerStyle={{ padding: 20, paddingTop: 12, paddingBottom: 140, gap: 8 }}
+          contentContainerStyle={{ paddingHorizontal: side, paddingTop: 12, paddingBottom: 140, gap: 8 }}
           refreshControl={<RefreshControl refreshing={loading} onRefresh={reload} tintColor={c.primary} colors={[c.primary]} />}
           ListEmptyComponent={<Empty icon={<Users size={30} color={c.muted} />}>{kind === 'customer' ? t('noCustomers') : t('noSuppliers')}</Empty>}
           renderItem={({ item: p }) => (

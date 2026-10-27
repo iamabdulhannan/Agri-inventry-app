@@ -61,7 +61,6 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
               style={{
                 flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: c.dark ? '#102318' : '#0F2A1A', paddingVertical: 13, paddingHorizontal: 16,
                 borderRadius: radius.lg, borderWidth: 1, borderColor: color + '55',
-                shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 20, shadowOffset: { width: 0, height: 8 }, elevation: 10,
               }}
             >
               <Icon size={20} color={color} />

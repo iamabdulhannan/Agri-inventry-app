@@ -6,6 +6,7 @@ import { ProductRow } from '@/components/domain'
 import { ProductFormSheet } from '@/components/forms'
 import { Ambient, Chip, Empty, ErrorBox, IconBtn, Loading, PickerSheet, Row, SearchBar, Txt, useFeedback } from '@/components/ui'
 import { useOrg } from '@/lib/app'
+import { useLayout } from '@/lib/responsive'
 import { useCatalog } from '@/lib/catalog'
 import { daysBetween } from '@/lib/format'
 import { useI18n } from '@/lib/i18n'
@@ -21,6 +22,8 @@ export default function Products() {
   const { t, pick, lang } = useI18n()
   const { c } = useTheme()
   const insets = useSafeAreaInsets()
+  const { width, contentWidth } = useLayout()
+  const side = (width - contentWidth) / 2
   const { today, org, refresh } = useOrg()
   const { toast } = useFeedback()
   const params = useLocalSearchParams<{ filter?: string }>()
@@ -73,7 +76,7 @@ export default function Products() {
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <Ambient />
-      <View style={{ paddingTop: insets.top + 8, paddingHorizontal: 20 }}>
+      <View style={{ paddingTop: insets.top + 8, paddingHorizontal: side }}>
         <Row between>
           <View>
             <Txt v="h1">{t('navProducts')}</Txt>
@@ -85,11 +88,11 @@ export default function Products() {
           </Row>
         </Row>
         <SearchBar value={q} onChangeText={setQ} style={{ marginTop: 14 }} />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20, marginTop: 12, flexGrow: 0 }} contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -side, marginTop: 12, flexGrow: 0 }} contentContainerStyle={{ gap: 8, paddingHorizontal: side }}>
           {filters.map((f) => <Chip key={f.v} label={f.label} active={stock === f.v} onPress={() => setStock(f.v)} count={f.v === 'all' ? undefined : count(f.v)} />)}
         </ScrollView>
         {cat && cat.categories.length > 0 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20, marginTop: 8, flexGrow: 0 }} contentContainerStyle={{ gap: 14, paddingHorizontal: 22, paddingVertical: 6 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -side, marginTop: 8, flexGrow: 0 }} contentContainerStyle={{ gap: 14, paddingHorizontal: side + 2, paddingVertical: 6 }}>
             {[{ id: 'all', name: t('all'), name_ur: null }, ...cat.categories].map((x) => (
               <Txt key={x.id} v="small" weight="bold" color={category === x.id ? c.primary : c.muted} onPress={() => setCategory(x.id)} style={category === x.id ? { textDecorationLine: 'underline' } : undefined}>
                 {pick(x.name, x.name_ur)}
@@ -100,14 +103,14 @@ export default function Products() {
       </View>
 
       {loading && !cat ? (
-        <View style={{ paddingHorizontal: 20 }}><Loading rows={6} /></View>
+        <View style={{ paddingHorizontal: side }}><Loading rows={6} /></View>
       ) : error && !cat ? (
-        <View style={{ padding: 20 }}><ErrorBox error={error} onRetry={reload} /></View>
+        <View style={{ paddingHorizontal: side, paddingVertical: 20 }}><ErrorBox error={error} onRetry={reload} /></View>
       ) : (
         <FlatList
           data={list}
           keyExtractor={(p) => p.id}
-          contentContainerStyle={{ padding: 20, paddingTop: 10, paddingBottom: 140, gap: 8 }}
+          contentContainerStyle={{ paddingHorizontal: side, paddingTop: 10, paddingBottom: 140, gap: 8 }}
           initialNumToRender={12}
           refreshControl={<RefreshControl refreshing={loading} onRefresh={reload} tintColor={c.primary} colors={[c.primary]} />}
           ListEmptyComponent={<Empty icon={<PackageSearch size={30} color={c.muted} />}>{t('noProducts')}</Empty>}

@@ -4,6 +4,7 @@ import { FlatList, Pressable, TextInput, View, type StyleProp, type TextInputPro
 import { addDays, fmtDate, fmtMonth, isoOf } from '@/lib/format'
 import { useI18n } from '@/lib/i18n'
 import { fonts, radius, useTheme } from '@/lib/theme'
+import { MAX_FONT_SCALE } from '@/lib/responsive'
 import { haptic, PressScale, Row, Txt } from './core'
 import { Sheet } from './sheet'
 
@@ -41,12 +42,12 @@ export function Input({
           flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: c.surface, borderRadius: radius.md, borderWidth: 1.5,
           borderColor: invalid ? c.red : focus ? c.primary : c.border, paddingHorizontal: 14, height: big ? 60 : 50,
         },
-        focus && c.dark && { shadowColor: c.primary, shadowOpacity: 0.25, shadowRadius: 10, shadowOffset: { width: 0, height: 0 } },
         style,
       ]}
     >
       {icon}
       <TextInput
+        maxFontSizeMultiplier={MAX_FONT_SCALE}
         placeholderTextColor={c.faint}
         selectionColor={c.primary}
         {...rest}
@@ -219,6 +220,7 @@ export function Stepper({ value, onChange, step = 1, min = 0, invalid }: { value
     <View collapsable={false} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: c.surface, borderRadius: radius.md, borderWidth: 1.5, borderColor: invalid ? c.red : c.border, padding: 3 }}>
       {btn(<Minus size={18} color={c.text} />, -step)}
       <TextInput
+        maxFontSizeMultiplier={MAX_FONT_SCALE}
         value={value}
         onChangeText={onChange}
         keyboardType="decimal-pad"

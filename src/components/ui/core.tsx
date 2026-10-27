@@ -2,12 +2,12 @@ import * as Haptics from 'expo-haptics'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useEffect, useState, type ReactNode } from 'react'
 import {
-  Animated as RNAnimated, Easing as RNEasing,
+  Animated as RNAnimated,
   ActivityIndicator, Pressable, StyleSheet, Text, View,
   type GestureResponderEvent, type LayoutChangeEvent, type StyleProp, type TextProps, type TextStyle, type ViewStyle,
 } from 'react-native'
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated'
 import { useI18n } from '@/lib/i18n'
+import { MAX_FONT_SCALE, softShadow } from '@/lib/responsive'
 import { fonts, radius, toneColors, useTheme, type Tone } from '@/lib/theme'
 
 export const haptic = {
@@ -39,6 +39,7 @@ export function Txt({
   const { lang } = useI18n()
   return (
     <Text
+      maxFontSizeMultiplier={MAX_FONT_SCALE}
       {...rest}
       style={[
         VARIANTS[v],
@@ -57,17 +58,19 @@ export function Txt({
 export function Num({ style, size = 15, weight = 'bold', color, children, ...rest }: TextProps & { size?: number; weight?: keyof typeof fonts; color?: string }) {
   const { c } = useTheme()
   return (
-    <Text {...rest} style={[{ fontSize: size, fontFamily: fonts[weight], color: color ?? c.text, fontVariant: ['tabular-nums'], letterSpacing: size > 22 ? -0.8 : -0.2, writingDirection: 'ltr' }, style]}>
+    <Text maxFontSizeMultiplier={MAX_FONT_SCALE} {...rest} style={[{ fontSize: size, fontFamily: fonts[weight], color: color ?? c.text, fontVariant: ['tabular-nums'], letterSpacing: size > 22 ? -0.8 : -0.2, writingDirection: 'ltr' }, style]}>
       {children}
     </Text>
   )
 }
 
-// ------------------------------------------------------------------ press with spring scale
-const APressable = Animated.createAnimatedComponent(Pressable)
-
+// ------------------------------------------------------------------ press feedback
+/**
+ * Shrinks a little while pressed. Driven by React's pressed state (no animation library), so it can
+ * never be left half-scaled or faded.
+ */
 export function PressScale({
-  onPress, onLongPress, children, style, disabled, scaleTo = 0.96, hapticOnPress = true,
+  onPress, onLongPress, children, style, disabled, scaleTo = 0.97, hapticOnPress = true,
 }: {
   onPress?: (e: GestureResponderEvent) => void
   onLongPress?: () => void
@@ -77,22 +80,18 @@ export function PressScale({
   scaleTo?: number
   hapticOnPress?: boolean
 }) {
-  const s = useSharedValue(1)
-  const anim = useAnimatedStyle(() => ({ transform: [{ scale: s.value }] }))
   return (
-    <APressable
+    <Pressable
       disabled={disabled}
-      onPressIn={() => (s.set(withSpring(scaleTo, { damping: 15, stiffness: 400 })))}
-      onPressOut={() => (s.set(withSpring(1, { damping: 12, stiffness: 300 })))}
       onPress={(e) => {
         if (hapticOnPress) haptic.tap()
         onPress?.(e)
       }}
       onLongPress={onLongPress}
-      style={[style, anim, disabled && { opacity: 0.5 }]}
+      style={({ pressed }) => [style, pressed && { transform: [{ scale: scaleTo }] }, disabled && { opacity: 0.5 }]}
     >
       {children}
-    </APressable>
+    </Pressable>
   )
 }
 
@@ -102,8 +101,8 @@ export function Card({ children, style, onPress, padded = true, glow }: { childr
   const glowColor = glow ? toneColors(c, glow).fg : undefined
   const base: StyleProp<ViewStyle> = [
     { backgroundColor: c.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: glowColor ? glowColor + '55' : c.border, padding: padded ? 16 : 0 },
-    !c.dark && { shadowColor: c.shadow, shadowOpacity: 0.06, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 2 },
-    glowColor && { shadowColor: glowColor, shadowOpacity: c.dark ? 0.35 : 0.18, shadowRadius: 18, shadowOffset: { width: 0, height: 0 } },
+    !c.dark && softShadow(c.shadow, 0.06, 14, 6),
+    glowColor && { borderWidth: 1.5 },
     style,
   ]
   if (onPress) return <PressScale onPress={onPress} scaleTo={0.98} style={base}>{children}</PressScale>
@@ -152,7 +151,7 @@ export function Button({
     variant === 'secondary' && { backgroundColor: c.surface2, borderWidth: 1, borderColor: c.border },
     variant === 'outline' && { borderWidth: 1.5, borderColor: c.borderStrong },
     variant === 'danger' && { backgroundColor: c.red },
-    variant === 'primary' && c.dark && { shadowColor: c.primary, shadowOpacity: 0.45, shadowRadius: 16, shadowOffset: { width: 0, height: 4 } },
+    variant === 'primary' && softShadow(c.dark ? c.primary : c.shadow, c.dark ? 0.35 : 0.15, 14, 4),
     style,
   ]
   return (
@@ -223,20 +222,24 @@ export function Segmented<T extends string>({ value, onChange, items, style }: {
   const { c } = useTheme()
   const [w, setW] = useState(0)
   const idx = Math.max(0, items.findIndex((i) => i.value === value))
-  const x = useSharedValue(0)
   const seg = w / items.length
+  // native-driver spring (React Native's own Animated); the pill always ends on the selected item
+  const [x] = useState(() => new RNAnimated.Value(0))
   useEffect(() => {
-    x.set(withSpring(idx * seg, { damping: 18, stiffness: 220 }))
+    RNAnimated.spring(x, { toValue: idx * seg, useNativeDriver: true, damping: 18, stiffness: 220, mass: 1 }).start()
   }, [idx, seg, x])
-  const pill = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }))
   return (
     <View
       onLayout={(e: LayoutChangeEvent) => setW(e.nativeEvent.layout.width - 8)}
       style={[{ flexDirection: 'row', backgroundColor: c.surface2, borderRadius: 16, padding: 4, borderWidth: 1, borderColor: c.border }, style]}
     >
       {w > 0 && (
-        <Animated.View
-          style={[{ position: 'absolute', top: 4, bottom: 4, left: 4, width: seg, borderRadius: 12, backgroundColor: c.dark ? c.surface3 : c.surface }, !c.dark && { shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 6, elevation: 2 }, pill]}
+        <RNAnimated.View
+          style={[
+            { position: 'absolute', top: 4, bottom: 4, left: 4, width: seg, borderRadius: 12, backgroundColor: c.dark ? c.surface3 : c.surface, borderWidth: c.dark ? 0 : 1, borderColor: c.border },
+            softShadow('#000', 0.08, 6, 2),
+            { transform: [{ translateX: x }] },
+          ]}
         />
       )}
       {items.map((it) => (
@@ -246,10 +249,10 @@ export function Segmented<T extends string>({ value, onChange, items, style }: {
             haptic.tap()
             onChange(it.value)
           }}
-          style={{ flex: 1, height: 38, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 }}
+          style={{ flex: 1, minHeight: 38, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 }}
         >
           {it.icon}
-          <Txt v="small" weight="bold" color={it.value === value ? c.text : c.muted} numberOfLines={1}>{it.label}</Txt>
+          <Txt v="small" weight="bold" color={it.value === value ? c.text : c.muted} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{it.label}</Txt>
         </Pressable>
       ))}
     </View>
@@ -288,31 +291,14 @@ export function IconTile({ icon, tone = 'primary', size = 40 }: { icon: ReactNod
 }
 
 /**
- * Fade + rise when mounted, staggered by index.
- * Uses React Native's built-in Animated (native driver), not Reanimated: on some Android phones a
- * Reanimated fade could stop half way and stay faded. When the animation ends (or after a safety
- * timeout) the view gets an explicit opacity 1 / no offset, which overrides anything left over.
+ * Section wrapper (kept as a stable native view). Earlier versions faded content in, but on some
+ * Android phones an interrupted fade left screens looking faded/blurry, so content now appears
+ * immediately and the motion lives in parts that cannot get stuck (counters, bars, press feedback).
  */
-export function Rise({ children, i = 0, style }: { children: ReactNode; i?: number; style?: StyleProp<ViewStyle> }) {
-  const [v] = useState(() => new RNAnimated.Value(0))
-  const [done, setDone] = useState(false)
-  useEffect(() => {
-    const delay = Math.min(i, 12) * 55
-    const anim = RNAnimated.timing(v, { toValue: 1, duration: 450, delay, easing: RNEasing.out(RNEasing.cubic), useNativeDriver: true })
-    anim.start(() => setDone(true))
-    const safety = setTimeout(() => setDone(true), delay + 1000)
-    return () => {
-      anim.stop()
-      clearTimeout(safety)
-    }
-  }, [v, i])
-  const motion = done
-    ? RISE_DONE
-    : { opacity: v, transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }] }
+export function Rise({ children, style }: { children: ReactNode; i?: number; style?: StyleProp<ViewStyle> }) {
   // collapsable={false}: stays one stable native view, so text fields inside keep focus on Android
-  return <RNAnimated.View collapsable={false} style={[style, motion]}>{children}</RNAnimated.View>
+  return <View collapsable={false} style={style}>{children}</View>
 }
-const RISE_DONE = { opacity: 1, transform: [{ translateY: 0 }] }
 
 const styles = StyleSheet.create({
   btnInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },

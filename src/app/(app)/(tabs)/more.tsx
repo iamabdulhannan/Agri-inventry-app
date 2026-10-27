@@ -7,7 +7,7 @@ import {
 } from 'lucide-react-native'
 import { StyleSheet, View } from 'react-native'
 import { LogoBadge } from '@/components/Logo'
-import { Card, PressScale, Rise, Row, Screen, SectionTitle, Segmented, Txt, useFeedback } from '@/components/ui'
+import { Card, Grid, PressScale, Rise, Row, Screen, SectionTitle, Segmented, Txt, useFeedback } from '@/components/ui'
 import { useOrg } from '@/lib/app'
 import { useI18n } from '@/lib/i18n'
 import { toneColors, useTheme, type ThemeMode, type Tone } from '@/lib/theme'
@@ -54,18 +54,18 @@ export default function More() {
 
       <Rise i={1}>
         <SectionTitle>{t('yourBusiness')}</SectionTitle>
-        <View style={styles.grid}>
+        <Grid>
           {tiles.map(({ icon: Icon, label, sub, tone, href }) => {
             const tc = toneColors(c, tone)
             return (
-              <PressScale key={label} onPress={() => router.push(href)} style={[styles.tile, { backgroundColor: c.surface, borderColor: c.border }]}>
+              <PressScale key={label} onPress={() => router.push(href)} style={[styles.tile, { flex: 1, backgroundColor: c.surface, borderColor: c.border }]}>
                 <View style={[styles.tileIcon, { backgroundColor: tc.bg }]}><Icon size={21} color={tc.fg} /></View>
                 <Txt weight="bold" numberOfLines={1} style={{ marginTop: 12 }}>{label}</Txt>
                 {!!sub && <Txt v="tiny" muted numberOfLines={1}>{sub}</Txt>}
               </PressScale>
             )
           })}
-        </View>
+        </Grid>
       </Rise>
 
       <Rise i={2}>
@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
   blob: { position: 'absolute', width: 200, height: 200, borderRadius: 100, top: -90, right: -60, opacity: 0.16 },
   role: { alignSelf: 'flex-start', marginTop: 6, backgroundColor: 'rgba(0,0,0,0.25)', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 99 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  tile: { width: '47%', flexGrow: 1, padding: 14, borderRadius: 22, borderWidth: 1 },
+  tile: { padding: 14, borderRadius: 22, borderWidth: 1 },
   tileIcon: { width: 44, height: 44, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   rowItem: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 16 },
   signOut: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, height: 54, borderRadius: 18, borderWidth: 1, marginTop: 22 },

@@ -4,6 +4,7 @@ import { Dimensions, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollVie
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler'
 import Animated, { Easing, FadeIn, runOnJS, SlideInDown, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useLayout } from '@/lib/responsive'
 import { useTheme } from '@/lib/theme'
 import { IconBtn, Txt } from './core'
 
@@ -25,6 +26,7 @@ export function Sheet({
 }) {
   const { c } = useTheme()
   const insets = useSafeAreaInsets()
+  const { isTablet } = useLayout()
   const [mounted, setMounted] = useState(open)
   // y is only the drag / close offset: the sheet's resting place (on screen) comes from React props,
   // so it shows even if Android drops a Reanimated update. Opening uses a mount animation (SlideInDown).
@@ -79,7 +81,7 @@ export function Sheet({
             entering={SlideInDown.springify().damping(22).stiffness(210).mass(0.9)}
             collapsable={false}
             // fill the space above the keyboard instead of a fixed height, so the header and search stay on screen
-            style={full ? { flex: 1, marginTop: insets.top + 24 } : { maxHeight: '92%' }}
+            style={[full ? { flex: 1, marginTop: insets.top + 24 } : { maxHeight: '92%' }, isTablet && { width: '100%', maxWidth: 640, alignSelf: 'center' }]}
           >
             <Animated.View
               collapsable={false}

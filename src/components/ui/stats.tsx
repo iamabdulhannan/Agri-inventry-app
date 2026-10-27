@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native'
+import { softShadow, useLayout } from '@/lib/responsive'
 import { toneColors, useTheme, type Tone } from '@/lib/theme'
 import { IconTile, Num, PressScale, Txt } from './core'
 
@@ -50,9 +51,27 @@ export function StatTile({
     </>
   )
   const shell: StyleProp<ViewStyle> = [
-    { flex: 1, minWidth: 150, backgroundColor: c.surface, borderRadius: 22, padding: 14, borderWidth: 1, borderColor: c.border, overflow: 'hidden' },
-    !c.dark && { shadowColor: c.shadow, shadowOpacity: 0.05, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 1 },
+    { flex: 1, backgroundColor: c.surface, borderRadius: 22, padding: 14, borderWidth: 1, borderColor: c.border, overflow: 'hidden' },
+    !c.dark && softShadow(c.shadow, 0.05, 12, 4),
     style,
   ]
   return onPress ? <PressScale onPress={onPress} scaleTo={0.97} style={shell}>{body}</PressScale> : <View style={shell}>{body}</View>
+}
+
+/**
+ * Responsive tile grid: 2 columns on phones, 3-4 on tablets (or `cols` to force).
+ * Tiles keep equal widths and wrap cleanly on every screen size.
+ */
+export function Grid({ children, cols, gap = 10, min = 2, style }: { children: ReactNode; cols?: number; gap?: number; min?: number; style?: StyleProp<ViewStyle> }) {
+  const { contentWidth, cols: auto } = useLayout()
+  const n = Math.max(min, cols ?? auto)
+  const w = Math.floor((contentWidth - gap * (n - 1)) / n)
+  const items = (Array.isArray(children) ? children : [children]).flat().filter(Boolean)
+  return (
+    <View style={[{ flexDirection: 'row', flexWrap: 'wrap', gap }, style]}>
+      {items.map((child, i) => (
+        <View key={i} style={{ width: w, flexDirection: 'row' }}>{child}</View>
+      ))}
+    </View>
+  )
 }
