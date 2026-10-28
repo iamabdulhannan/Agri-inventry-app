@@ -3,6 +3,7 @@ import { mobileEn, mobileUr } from './i18n-mobile'
 import { mBankEn, mBankUr } from './i18n-parts/m-bank'
 import { mInvestEn, mInvestUr } from './i18n-parts/m-invest'
 import { mAuditEn, mAuditUr } from './i18n-parts/m-audit'
+import { mKhataEn, mKhataUr } from './i18n-parts/m-khata'
 import { prefs } from './prefs'
 
 import { bankEn, bankUr } from './i18n-parts/bank'
@@ -14,7 +15,7 @@ import { offlineEn, offlineUr } from './i18n-parts/offline'
 export type Lang = 'en' | 'ur'
 
 const en = {
-  ...mobileEn, ...mBankEn, ...mInvestEn, ...mAuditEn, ...bankEn, ...saleEn, ...khataEn, ...investEn, ...offlineEn,
+  ...mobileEn, ...mBankEn, ...mKhataEn, ...mInvestEn, ...mAuditEn, ...bankEn, ...saleEn, ...khataEn, ...investEn, ...offlineEn,
   appName: 'Agri Inventory',
   tagline: 'Stock & expiry control for pesticides, fertilizers and seeds',
 
@@ -347,7 +348,7 @@ const en = {
 export type TKey = keyof typeof en
 
 const ur: Record<TKey, string> = {
-  ...mobileUr, ...mBankUr, ...mInvestUr, ...mAuditUr, ...bankUr, ...saleUr, ...khataUr, ...investUr, ...offlineUr,
+  ...mobileUr, ...mBankUr, ...mKhataUr, ...mInvestUr, ...mAuditUr, ...bankUr, ...saleUr, ...khataUr, ...investUr, ...offlineUr,
   appName: 'زرعی انوینٹری',
   tagline: 'زرعی ادویات، کھاد اور بیج کا اسٹاک اور ایکسپائری کنٹرول',
 

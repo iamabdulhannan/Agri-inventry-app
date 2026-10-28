@@ -4,12 +4,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { Pressable, View } from 'react-native'
 import { BalanceBadge, PartyAvatar, PartyPickerSheet, ProductAvatar, ProductPickerSheet, usePackLabel } from '@/components/domain'
 import { PartyFormSheet } from '@/components/forms'
+import { AccountPicker } from '@/components/money'
 import {
-  Badge, Button, CalendarSheet, Card, ErrorBox, Field, IconBtn, Input, Loading, NumInput, PickerSheet, PressScale, Row, Screen, Segmented, Stepper, Txt, useFeedback, Rise } from '@/components/ui'
+  Badge, Button, CalendarSheet, Card, Chip, DateField, ErrorBox, Field, HScroll, IconBtn, Input, Loading, NumInput, PickerSheet, PressScale, Row, Screen, Segmented, Stepper, Txt, useFeedback, Rise } from '@/components/ui'
 import { useOrg } from '@/lib/app'
 import { loadBatches, loadCatalog, loadParties } from '@/lib/catalog'
 import { useLoad } from '@/lib/data'
 import { errText } from '@/lib/errors'
+import { DUE_PRESETS, dueFromRule } from '@/lib/due'
 import { daysBetween, fmtDate } from '@/lib/format'
 import { useI18n } from '@/lib/i18n'
 import { canSellLoose, exceeds, kgFits, kgToPacks, packsToKg, perKg, perPack, type SaleUnit } from '@/lib/loose'
@@ -19,6 +21,7 @@ import { useTheme } from '@/lib/theme'
 import { OUT_TYPES, type BatchStock, type MovementType } from '@/lib/types'
 import { fmtNum, fmtTotal, unitLabel } from '@/lib/units'
 
+interface Advance { id: string; crop: string | null; season: string | null; balance: number }
 interface Line { key: number; product_id: string; batch_id: string; qty: string; rate: string; unit: SaleUnit }
 const rateOf = (n?: number | null) => (Number(n) > 0 ? String(Number(n)) : '')
 let seq = 1
@@ -54,6 +57,36 @@ export default function Sale() {
   const [dateOpen, setDateOpen] = useState(false)
   const [typeOpen, setTypeOpen] = useState(false)
   const [batchFor, setBatchFor] = useState<number | null>(null)
+  // credit sale extras (khata customers only)
+  const [rateMode, setRateMode] = useState<'cash' | 'credit'>('cash')
+  const [markupPct, setMarkupPct] = useState('')
+  const [useAdvance, setUseAdvance] = useState(false)
+  const [advanceId, setAdvanceId] = useState('')
+  const [advanceAmt, setAdvanceAmt] = useState('') // '' = as much as fits
+  const [account, setAccount] = useState('') // '' = cash in hand
+  const [dueDate, setDueDate] = useState('')
+  const [dueTouched, setDueTouched] = useState(false)
+
+  // open crop advances of the chosen customer (empty before migration 013)
+  const advLoad = useLoad(async () => {
+    if (!partyId) return { partyId, list: [] as Advance[] }
+    const { data: rows, error: e } = await supabase
+      .from('crop_advance_balances')
+      .select('id, crop, season, balance')
+      .eq('org_id', org.id)
+      .eq('party_id', partyId)
+      .eq('is_closed', false)
+      .gt('balance', 0)
+      .order('created_at')
+    if (e) return { partyId, list: [] as Advance[] }
+    return { partyId, list: ((rows ?? []) as Advance[]).map((a) => ({ ...a, balance: Number(a.balance) })) }
+  }, [org.id, partyId, version])
+
+  const dueRule = (data?.customers.find((x) => x.id === partyId) as { due_rule?: string | null } | undefined)?.due_rule ?? null
+  // default promised date from the customer's rule, until the user picks one
+  useEffect(() => {
+    if (!dueTouched) setDueDate(partyId ? dueFromRule(dueRule, date) ?? '' : '')
+  }, [partyId, dueRule, date, dueTouched])
 
   useEffect(() => {
     if (!data || lines.length || !params.product) return
@@ -65,6 +98,10 @@ export default function Sale() {
     if (pendingParty && data?.customers.some((p) => p.id === pendingParty)) {
       setPartyId(pendingParty)
       setPendingParty(null)
+      setUseAdvance(false)
+      setAdvanceId('')
+      setAdvanceAmt('')
+      setDueTouched(false)
     }
   }, [pendingParty, data])
 
@@ -98,16 +135,61 @@ export default function Sale() {
       : { unit, qty: q > 0 ? String(kgToPacks(q, size)) : l.qty, rate: r > 0 ? String(perPack(r, size)) : l.rate })
   }
 
+  // ---- cash / credit rate (khata customers only)
+  const creditOf = (id: string) => Number((catalog.byId.get(id) as { credit_price?: number } | undefined)?.credit_price) || 0
+  /** rate per pack for a mode: credit price when set, otherwise the cash rate (MRP) */
+  const packPriceFor = (id: string, mode: 'cash' | 'credit') => (mode === 'credit' && creditOf(id) > 0 ? creditOf(id) : Number(catalog.byId.get(id)?.sale_price) || 0)
+  const creditMode = isSale && !!partyId && rateMode === 'credit'
+  /** switch mode: only lines whose product has a credit rate change, others keep what was typed */
+  const applyRateMode = (mode: 'cash' | 'credit') => {
+    setRateMode(mode)
+    setLines((ls) =>
+      ls.map((l) => {
+        if (!l.product_id || !(creditOf(l.product_id) > 0)) return l
+        const r = packPriceFor(l.product_id, mode)
+        return { ...l, rate: r > 0 ? String(looseOf(l) ? perKg(r, sizeOf(l)) : r) : '' }
+      }),
+    )
+  }
+  const noCreditRate = creditMode ? lines.filter((l) => l.product_id && !(creditOf(l.product_id) > 0)).length : 0
+
+  const chooseCustomer = (id: string) => {
+    setPartyId(id)
+    setReceived('')
+    setUseAdvance(false)
+    setAdvanceId('')
+    setAdvanceAmt('')
+    setDueTouched(false)
+    // walk-in sales are always at the cash rate
+    if (!id && rateMode === 'credit') applyRateMode('cash')
+  }
+
   const subtotal = r2(lines.reduce((s, l) => s + amountOf(l), 0))
   const disc = Number(discount) || 0
-  const total = r2(subtotal - disc)
+  // markup % on a credit bill (khata customers only), rounded like the server
+  const pct = isSale && partyId ? Number(markupPct) || 0 : 0
+  const markup = pct > 0 ? r2(((subtotal - disc) * pct) / 100) : 0
+  const total = r2(subtotal - disc + markup)
+
+  // ---- crop advance of this customer
+  const advances = isSale && partyId && advLoad.data?.partyId === partyId ? advLoad.data.list : []
+  const adv = advances.find((a) => a.id === advanceId) ?? advances[0]
+  const advOn = useAdvance && !!adv
+  const advDefault = adv ? r2(Math.max(0, Math.min(adv.balance, total))) : 0
+  const advNum = advOn ? (advanceAmt === '' ? advDefault : Number(advanceAmt) || 0) : 0
+  const advTooMuch = advOn && !!adv && (advNum > adv.balance || advNum > total)
+  const advLabel = (a: Advance) => [a.crop, a.season].filter(Boolean).join(' ')
+
+  // empty Received: walk-in = paid in full; khata customer = nothing received (all on credit)
   const paidNum = received === '' ? (partyId ? 0 : total) : Number(received) || 0
-  const due = r2(total - paidNum)
+  const toPay = r2(total - advNum) // what is left after the advance
+  const due = r2(total - paidNum - advNum)
+  const dueIn = dueDate ? daysBetween(today, dueDate) : null
 
   const addProduct = (id: string) => {
     const existing = lines.find((l) => l.product_id === id && !l.batch_id && l.unit === 'pack')
     if (existing) return set(existing.key, { qty: String((Number(existing.qty) || 0) + 1) })
-    setLines((ls) => [...ls, { key: seq++, product_id: id, batch_id: '', qty: '1', rate: rateOf(catalog.byId.get(id)?.sale_price), unit: 'pack' }])
+    setLines((ls) => [...ls, { key: seq++, product_id: id, batch_id: '', qty: '1', rate: rateOf(packPriceFor(id, creditMode ? 'credit' : 'cash')), unit: 'pack' }])
   }
 
   const save = async () => {
@@ -120,12 +202,14 @@ export default function Sale() {
     }
     if (isSale) {
       if (disc < 0 || disc > subtotal) return setErr(t('errInvalidDiscount'))
-      if (paidNum < 0 || paidNum > total) return setErr(t('errInvalidPaid'))
+      if (partyId && Number(markupPct) < 0) return setErr(t('errInvalidAmount'))
+      if (advOn && (advNum < 0 || advTooMuch)) return setErr(t('errAdvanceTooMuch'))
+      if (paidNum < 0 || r2(paidNum + advNum) > total) return setErr(t('errInvalidPaid'))
       if (due > 0 && !partyId) return setErr(t('errCreditNeedsParty'))
     }
     setBusy(true)
     if (isSale) {
-      const { data: saleId, error } = await supabase.rpc('record_sale', {
+      const args: Record<string, unknown> = {
         p_org: org.id,
         p_date: date,
         p_lines: lines.map((l) => ({ product_id: l.product_id, batch_id: l.batch_id || null, qty: packsOf(l), unit_price: packRateOf(l), loose: looseOf(l) })),
@@ -134,7 +218,16 @@ export default function Sale() {
         p_discount: disc,
         p_paid: paidNum,
         p_note: note || null,
-      })
+      }
+      // the money extras are only sent when used
+      if (markup > 0) args.p_markup = markup
+      if (due > 0 && partyId && dueDate) args.p_due_date = dueDate
+      if (paidNum > 0 && account) args.p_account = account
+      if (advNum > 0 && adv) {
+        args.p_advance = adv.id
+        args.p_advance_amount = advNum
+      }
+      const { data: saleId, error } = await supabase.rpc('record_sale', args)
       setBusy(false)
       if (error) return setErr(errText(error, t))
       const { data: s } = await supabase.from('sales').select('invoice_no').eq('id', saleId as string).single()
@@ -328,31 +421,89 @@ export default function Sale() {
       {/* payment */}
       {isSale && lines.length > 0 && (
         <Card style={{ marginTop: 18, gap: 14 }}>
+          {!!partyId && (
+            <Field label={t('saleRateLabel')}>
+              <Segmented value={rateMode} onChange={applyRateMode} items={[{ value: 'cash', label: t('saleRateCash') }, { value: 'credit', label: t('saleRateCredit') }]} />
+              {noCreditRate > 0 && <Txt v="tiny" color={c.amber}>{t('saleNoCreditRate', { n: noCreditRate })}</Txt>}
+            </Field>
+          )}
           <Row between>
             <Txt muted>{t('subtotal')}</Txt>
             <Txt weight="bold">{fmtMoney(subtotal, lang)}</Txt>
           </Row>
-          <Field label={t('discount')} optional>
-            <NumInput value={discount} onChangeText={setDiscount} placeholder="0" />
-          </Field>
+          <Row gap={10} center={false}>
+            <Field label={t('discount')} optional style={{ flex: 1 }}>
+              <NumInput value={discount} onChangeText={setDiscount} placeholder="0" />
+            </Field>
+            {!!partyId && (
+              <Field label={t('saleMarkupPct')} optional style={{ flex: 1 }} hint={markup > 0 ? `+ ${fmtMoney(markup, lang)}` : undefined}>
+                <NumInput value={markupPct} onChangeText={setMarkupPct} placeholder="0" suffix={<Txt muted weight="bold">%</Txt>} />
+              </Field>
+            )}
+          </Row>
+          <Row between style={{ padding: 12, borderRadius: 16, backgroundColor: c.primarySoft }}>
+            <Txt weight="bold">{t('grandTotal')}</Txt>
+            <Txt v="h2" color={c.primary}>{fmtMoney(total, lang)}</Txt>
+          </Row>
+
+          {advances.length > 0 && (
+            <View style={{ gap: 10, padding: 12, borderRadius: 16, borderWidth: 1, borderColor: useAdvance ? c.green + '70' : c.border, backgroundColor: useAdvance ? c.greenSoft : 'transparent' }}>
+              <Row between>
+                <View style={{ flex: 1 }}>
+                  <Txt weight="bold">{t('saleCropAdvance')}</Txt>
+                  <Txt v="tiny" muted numberOfLines={1}>{adv ? `${advLabel(adv)} · ${t('saleLeft', { amount: fmtMoney(adv.balance, lang) })}` : ''}</Txt>
+                </View>
+                <Chip label={t('salePayFromAdvance')} active={useAdvance} onPress={() => { setUseAdvance((v) => !v); setAdvanceAmt('') }} />
+              </Row>
+              {useAdvance && advances.length > 1 && (
+                <HScroll gap={8}>
+                  {advances.map((a) => (
+                    <Chip key={a.id} label={`${advLabel(a) || t('saleCropAdvance')} · ${fmtMoney(a.balance, lang)}`} active={adv?.id === a.id} onPress={() => { setAdvanceId(a.id); setAdvanceAmt('') }} />
+                  ))}
+                </HScroll>
+              )}
+              {useAdvance && (
+                <Field label={t('saleAdvanceAmount')} error={advTooMuch ? t('errAdvanceTooMuch') : undefined}>
+                  <NumInput value={advanceAmt} onChangeText={setAdvanceAmt} placeholder={String(advDefault)} invalid={advTooMuch} />
+                </Field>
+              )}
+            </View>
+          )}
+
           <Field label={t('received')} hint={partyId ? t('receivedHintKhata') : t('receivedHintWalkIn')}>
-            <NumInput value={received} onChangeText={setReceived} placeholder={partyId ? '0' : String(total)} />
+            <NumInput value={received} onChangeText={setReceived} placeholder={partyId ? '0' : String(toPay)} />
           </Field>
-          {!!partyId && total > 0 && (
+          {!!partyId && toPay > 0 && (
             <Segmented
-              value={paidNum === total ? 'full' : paidNum === 0 ? 'credit' : ('' as 'full')}
-              onChange={(v) => setReceived(v === 'full' ? String(total) : '0')}
+              value={paidNum === toPay ? 'full' : paidNum === 0 ? 'credit' : ('' as 'full')}
+              onChange={(v) => setReceived(v === 'full' ? String(toPay) : '0')}
               items={[{ value: 'full', label: t('fullPayment') }, { value: 'credit', label: t('onCredit') }]}
             />
           )}
+          {paidNum > 0 && (
+            <AccountPicker value={account} onChange={setAccount} title={t('saleReceivedInto')} />
+          )}
+
           <View style={{ padding: 12, borderRadius: 16, backgroundColor: due > 0 ? c.amberSoft : c.surface2 }}>
             <Row between>
               <Txt v="small" muted>{t('balanceDue')}</Txt>
               <Txt weight="extrabold" color={due > 0 ? c.amber : c.text}>{fmtMoney(due, lang)}</Txt>
             </Row>
             {due > 0 && !partyId && <Txt v="tiny" color={c.red} style={{ marginTop: 4 }}>{t('errCreditNeedsParty')}</Txt>}
-            {due > 0 && customer && <Txt v="tiny" muted style={{ marginTop: 4 }}>{t('newBalance')}: {fmtMoney(customer.balance + due, lang)}</Txt>}
+            {due > 0 && !!customer && <Txt v="tiny" muted style={{ marginTop: 4 }}>{t('newBalance')}: {fmtMoney(customer.balance + due, lang)}</Txt>}
           </View>
+
+          {due > 0 && !!partyId && (
+            <Field label={t('salePayBy')} hint={dueIn !== null ? (dueIn < 0 ? t('saleOverdueDays', { n: -dueIn }) : t('daysLeft', { n: dueIn })) : undefined}>
+              <HScroll gap={8}>
+                {DUE_PRESETS.map((p) => {
+                  const d = dueFromRule(p.rule, date)
+                  return <Chip key={p.rule} label={t(p.key)} active={!!d && d === dueDate} onPress={() => { setDueDate(d ?? ''); setDueTouched(true) }} />
+                })}
+              </HScroll>
+              <DateField value={dueDate} onChange={(d) => { setDueDate(d); setDueTouched(true) }} min={date} label={t('salePayBy')} placeholder={t('salePayBy')} />
+            </Field>
+          )}
         </Card>
       )}
       <Input value={note} onChangeText={setNote} placeholder={`${t('note')} (${t('optional')})`} style={{ marginTop: 14 }} />
@@ -365,11 +516,11 @@ export default function Sale() {
         kind="customer"
         parties={data.customers}
         value={partyId}
-        onPick={(id) => { setPartyId(id); setReceived('') }}
+        onPick={chooseCustomer}
         noneLabel={t('walkIn')}
         onNew={() => setNewParty(true)}
       />
-      <PartyFormSheet open={newParty} onClose={() => setNewParty(false)} kind="customer" onSaved={(id) => { setNewParty(false); setPendingParty(id); setReceived(''); reload() }} />
+      <PartyFormSheet open={newParty} onClose={() => setNewParty(false)} kind="customer" onSaved={(id) => { setNewParty(false); setPendingParty(id); setReceived(''); setDueTouched(false); reload() }} />
       <CalendarSheet open={dateOpen} onClose={() => setDateOpen(false)} value={date} onPick={setDate} max={today} />
       <PickerSheet
         open={typeOpen}

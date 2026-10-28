@@ -19,9 +19,14 @@ interface Searchable {
   notes?: string | null
 }
 
-const norm = (s: string | null | undefined) => (s ?? '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '')
+// Hermes-safe: no Unicode property escapes, and normalize() only when the engine has it
+const fold = (s: string) => (typeof s.normalize === 'function' ? s.normalize('NFKD').replace(/[\u0300-\u036f]/g, '') : s)
+const norm = (s: string | null | undefined) => fold((s ?? '').toLowerCase())
+/** letters / digits we search on: Latin, digits and the Arabic-script block used for Urdu */
+const NOT_WORD = /[^a-z0-9\u00c0-\u024f\u0600-\u06ff\u0750-\u077f.%]+/
+const NOT_ALNUM = /[^a-z0-9\u00c0-\u024f\u0600-\u06ff\u0750-\u077f]/g
 /** words of a text: letters/digits, keeping "1.9" and "50%" together */
-const words = (s: string | null | undefined) => norm(s).split(/[^\p{L}\p{N}.%]+/u).filter(Boolean)
+const words = (s: string | null | undefined) => norm(s).split(NOT_WORD).filter(Boolean)
 export const searchTerms = (q: string) => words(q)
 
 function termScore(p: Searchable, term: string): number {
@@ -29,7 +34,7 @@ function termScore(p: Searchable, term: string): number {
   if (name.startsWith(term)) return 100
   if (words(p.name).some((w) => w.startsWith(term))) return 80
   if (p.name_ur && (norm(p.name_ur).startsWith(term) || words(p.name_ur).some((w) => w.startsWith(term)))) return 75
-  if (term.length >= 2 && name.replace(/[^\p{L}\p{N}]/gu, '').includes(term.replace(/[^\p{L}\p{N}]/gu, ''))) return 30
+  if (term.length >= 2 && name.replace(NOT_ALNUM, '').includes(term.replace(NOT_ALNUM, ''))) return 30
   if (words(p.company_name).some((w) => w.startsWith(term))) return 40
   const pack = `${fmtPack(p.pack_size, p.pack_unit)} ${p.pack_size}${p.pack_unit}`
   if (words(pack).some((w) => w.startsWith(term))) return 35
@@ -62,7 +67,7 @@ export function matchRange(text: string, q: string): [number, number] | null {
   const lower = norm(text)
   for (const term of searchTerms(q)) {
     // prefer the start of a word
-    const re = new RegExp(`(^|[^\\p{L}\\p{N}])(${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'u')
+    const re = new RegExp(`(^|[^a-z0-9\\u00c0-\\u024f\\u0600-\\u06ff\\u0750-\\u077f])(${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`)
     const m = re.exec(lower)
     if (m) {
       const start = m.index + m[1].length

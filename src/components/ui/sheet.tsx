@@ -1,6 +1,6 @@
 import { X } from 'lucide-react-native'
 import { useEffect, useState, type ReactNode } from 'react'
-import { Dimensions, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { Dimensions, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler'
 import Animated, { Easing, FadeIn, runOnJS, SlideInDown, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -9,6 +9,19 @@ import { useTheme } from '@/lib/theme'
 import { IconBtn, Txt } from './core'
 
 const H = Dimensions.get('window').height
+
+/**
+ * Sheets that are still sliding away. iOS drops a modal presented while another one is being dismissed,
+ * so the confirm dialog waits for this to reach 0 (see feedback.tsx).
+ */
+let closing = 0
+export function sheetsSettled(maxWait = 700): Promise<void> {
+  return new Promise((resolve) => {
+    const start = Date.now()
+    const check = () => (closing <= 0 || Date.now() - start > maxWait ? resolve() : setTimeout(check, 40))
+    check()
+  })
+}
 
 /** Bottom sheet: springs up, drag the handle down to close */
 export function Sheet({
@@ -32,6 +45,20 @@ export function Sheet({
   // so it shows even if Android drops a Reanimated update. Opening uses a mount animation (SlideInDown).
   const y = useSharedValue(0)
   const fade = useSharedValue(1)
+  // Android: an edge-to-edge modal window is not always resized for the keyboard, so lift the sheet
+  // by however much the keyboard still covers (0 when the window did resize, so it never adjusts twice)
+  const [kb, setKb] = useState(0)
+  const [rootH, setRootH] = useState(0)
+  useEffect(() => {
+    if (Platform.OS !== 'android' || !mounted) return
+    const show = Keyboard.addListener('keyboardDidShow', (e) => setKb(e.endCoordinates.height))
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKb(0))
+    return () => {
+      show.remove()
+      hide.remove()
+    }
+  }, [mounted])
+  const lift = kb > 0 && rootH > 0 ? Math.max(0, kb - (Dimensions.get('screen').height - rootH)) : 0
 
   useEffect(() => {
     if (open) {
@@ -44,8 +71,20 @@ export function Sheet({
     fade.set(withTiming(0, { duration: 200 }))
     y.set(withTiming(H, { duration: 260, easing: Easing.in(Easing.cubic) }))
     // unmount on a timer rather than the animation callback, so a dropped animation can't leave an invisible sheet
+    closing++
+    let counted = true
+    const settle = () => {
+      if (counted) closing--
+      counted = false
+    }
+    // a little after unmount, so the native modal has finished dismissing
     const id = setTimeout(() => setMounted(false), 280)
-    return () => clearTimeout(id)
+    const id2 = setTimeout(settle, 420)
+    return () => {
+      clearTimeout(id)
+      clearTimeout(id2)
+      settle()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
@@ -68,14 +107,14 @@ export function Sheet({
   )
   return (
     <Modal visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
-      <GestureHandlerRootView style={{ flex: 1 }}>
+      <GestureHandlerRootView style={{ flex: 1 }} onLayout={(e) => setRootH(e.nativeEvent.layout.height)}>
         <Animated.View entering={FadeIn.duration(240)} style={StyleSheet.absoluteFill}>
           <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: c.overlay }, backdrop]}>
             <Pressable style={{ flex: 1 }} onPress={onClose} />
           </Animated.View>
         </Animated.View>
         {/* Android already resizes the modal window for the keyboard; adjusting again pushed the sheet off screen */}
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} enabled={Platform.OS === 'ios'} style={{ flex: 1, justifyContent: 'flex-end' }} pointerEvents="box-none">
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} enabled={Platform.OS === 'ios'} style={{ flex: 1, justifyContent: 'flex-end', paddingBottom: lift }} pointerEvents="box-none">
           {/* outer: mount (slide-in) animation and size limits; inner: the drag offset. Kept apart as Reanimated asks. */}
           <Animated.View
             entering={SlideInDown.springify().damping(22).stiffness(210).mass(0.9)}

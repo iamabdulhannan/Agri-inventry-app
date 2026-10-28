@@ -3,12 +3,14 @@ import { useEffect, useState } from 'react'
 import { Pressable, View } from 'react-native'
 import { useOrg } from '@/lib/app'
 import type { Catalog } from '@/lib/catalog'
+import type { PartyWithRule } from '@/lib/khataMoney'
 import { errText } from '@/lib/errors'
 import { useI18n } from '@/lib/i18n'
 import { supabase } from '@/lib/supabase'
 import { useTheme } from '@/lib/theme'
 import type { PackType, PackUnit, Party, PartyKind, Product } from '@/lib/types'
 import { LIQUID_PRESETS, PACK_TYPES, SOLID_PRESETS, fmtPack, measureOf, suggestPackType, type Preset } from '@/lib/units'
+import { DueRuleChips } from './khata/DueRuleChips'
 import { Button, Chip, ErrorBox, Field, Input, NumInput, PressScale, Row, Segmented, Select, Sheet, Txt } from './ui'
 
 // ------------------------------------------------------------------ customer / supplier
@@ -21,6 +23,7 @@ export function PartyFormSheet({ open, onClose, kind, party, onSaved }: { open: 
   const [address, setAddress] = useState('')
   const [opening, setOpening] = useState('')
   const [notes, setNotes] = useState('')
+  const [dueRule, setDueRule] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -32,16 +35,21 @@ export function PartyFormSheet({ open, onClose, kind, party, onSaved }: { open: 
     setAddress(party?.address ?? '')
     setOpening(party && Number(party.opening_balance) ? String(Number(party.opening_balance)) : '')
     setNotes(party?.notes ?? '')
+    setDueRule((party as PartyWithRule | null | undefined)?.due_rule ?? '')
   }, [open, party])
 
   const save = async () => {
     setError('')
     if (!name.trim()) return setError(`${t('name')} *`)
     const row = { name: name.trim(), phone: phone.trim() || null, address: address.trim() || null, opening_balance: Number(opening) || 0, notes: notes.trim() || null }
+    const write = (r: typeof row & { due_rule?: string | null }) =>
+      party
+        ? supabase.from('parties').update(r).eq('id', party.id).select('id').single()
+        : supabase.from('parties').insert({ ...r, org_id: org.id, kind }).select('id').single()
     setBusy(true)
-    const res = party
-      ? await supabase.from('parties').update(row).eq('id', party.id).select('id').single()
-      : await supabase.from('parties').insert({ ...row, org_id: org.id, kind }).select('id').single()
+    let res = await write(kind === 'customer' ? { ...row, due_rule: dueRule || null } : row)
+    // before migration 013 there is no due_rule column: save the rest
+    if (res.error && kind === 'customer' && /due_rule/.test(`${res.error.message} ${res.error.details ?? ''}`)) res = await write(row)
     setBusy(false)
     if (res.error) return setError(errText(res.error, t))
     onSaved(res.data.id)
@@ -54,7 +62,7 @@ export function PartyFormSheet({ open, onClose, kind, party, onSaved }: { open: 
       title={party ? t('editParty') : kind === 'customer' ? t('addCustomer') : t('addSupplier')}
       footer={<Button title={t('save')} onPress={save} loading={busy} style={{ flex: 1 }} size="lg" icon={<Check size={18} color={c.primaryText} />} />}
     >
-      <View style={{ gap: 14 }}>
+      <View collapsable={false} style={{ gap: 14 }}>
         <Field label={t('name')}>
           <Input value={name} onChangeText={setName} placeholder={kind === 'customer' ? 'Muhammad Aslam' : 'Ali Akbar Group'} icon={<User size={18} color={c.muted} />} />
         </Field>
@@ -67,6 +75,11 @@ export function PartyFormSheet({ open, onClose, kind, party, onSaved }: { open: 
         <Field label={t('openingBalance')} hint={kind === 'customer' ? t('openingHintCustomer') : t('openingHintSupplier')}>
           <NumInput value={opening} onChangeText={setOpening} placeholder="0" keyboardType="numbers-and-punctuation" />
         </Field>
+        {kind === 'customer' && (
+          <Field label={t('khUsuallyPays')} hint={t('khUsuallyPaysHint')}>
+            <DueRuleChips value={dueRule} onChange={setDueRule} />
+          </Field>
+        )}
         <Field label={t('note')} optional>
           <Input value={notes} onChangeText={setNotes} />
         </Field>
@@ -77,7 +90,11 @@ export function PartyFormSheet({ open, onClose, kind, party, onSaved }: { open: 
 }
 
 // ------------------------------------------------------------------ product (several pack sizes at once)
-interface SizeRow extends Preset { type: PackType; purchase: string; mrp: string }
+/** credit: optional credit (udhaar) price per pack, products.credit_price (migration 013) */
+interface SizeRow extends Preset { type: PackType; purchase: string; mrp: string; credit: string }
+const creditValue = (v: string) => (Number(v) > 0 ? Number(v) : null)
+/** save without credit_price when the column does not exist yet (migration 013 not run) */
+const missingCredit = (e: { message?: string } | null) => !!e && /credit_price/.test(e.message ?? '')
 const key = (s: Preset) => `${s.size}|${s.unit}`
 
 export function ProductFormSheet({ open, onClose, catalog, product, onSaved }: { open: boolean; onClose: () => void; catalog: Catalog; product?: Product | null; onSaved: (ids: string[]) => void }) {
@@ -109,7 +126,7 @@ export function ProductFormSheet({ open, onClose, catalog, product, onSaved }: {
       setCompanyId(product.company_id ?? '')
       const m = measureOf(product.pack_unit)
       setKind(m === 'volume' ? 'liquid' : m === 'weight' ? 'dry' : 'pcs')
-      setSizes([{ size: Number(product.pack_size), unit: product.pack_unit, type: product.pack_type, purchase: product.purchase_price ? String(Number(product.purchase_price)) : '', mrp: product.sale_price ? String(Number(product.sale_price)) : '' }])
+      setSizes([{ size: Number(product.pack_size), unit: product.pack_unit, type: product.pack_type, purchase: product.purchase_price ? String(Number(product.purchase_price)) : '', mrp: product.sale_price ? String(Number(product.sale_price)) : '', credit: Number((product as { credit_price?: number | null }).credit_price) > 0 ? String(Number((product as { credit_price?: number | null }).credit_price)) : '' }])
       setMinStock(product.min_stock ? String(product.min_stock) : '')
     } else {
       setName('')
@@ -126,7 +143,7 @@ export function ProductFormSheet({ open, onClose, catalog, product, onSaved }: {
   const presets = kind === 'liquid' ? LIQUID_PRESETS : kind === 'dry' ? SOLID_PRESETS : []
   const has = (p: Preset) => sizes.some((s) => key(s) === key(p))
   const toggle = (p: Preset) => {
-    const row: SizeRow = { ...p, type: suggestPackType(p.size, p.unit), purchase: '', mrp: '' }
+    const row: SizeRow = { ...p, type: suggestPackType(p.size, p.unit), purchase: '', mrp: '', credit: '' }
     if (editing) return setSizes([row])
     setSizes((list) => (has(p) ? list.filter((s) => key(s) !== key(p)) : [...list, row]))
   }
@@ -160,15 +177,15 @@ export function ProductFormSheet({ open, onClose, catalog, product, onSaved }: {
       const base = { name: name.trim(), name_ur: nameUr.trim() || null, category_id: categoryId, company_id: company, min_stock: Math.max(0, Number(minStock) || 0) }
       if (editing && product) {
         const s = sizes[0]
-        const { error } = await supabase
-          .from('products')
-          .update({ ...base, pack_size: s.size, pack_unit: s.unit, pack_type: s.type, purchase_price: Number(s.purchase) || 0, sale_price: Number(s.mrp) || 0 })
-          .eq('id', product.id)
+        const row = { ...base, pack_size: s.size, pack_unit: s.unit, pack_type: s.type, purchase_price: Number(s.purchase) || 0, sale_price: Number(s.mrp) || 0 }
+        let { error } = await supabase.from('products').update({ ...row, credit_price: creditValue(s.credit) }).eq('id', product.id)
+        if (missingCredit(error)) ({ error } = await supabase.from('products').update(row).eq('id', product.id))
         if (error) throw error
         onSaved([product.id])
       } else {
         const rows = sizes.map((s) => ({ ...base, org_id: org.id, pack_size: s.size, pack_unit: s.unit, pack_type: s.type, purchase_price: Number(s.purchase) || 0, sale_price: Number(s.mrp) || 0 }))
-        const { data, error } = await supabase.from('products').insert(rows).select('id')
+        let { data, error } = await supabase.from('products').insert(rows.map((r, i) => ({ ...r, credit_price: creditValue(sizes[i].credit) }))).select('id')
+        if (missingCredit(error)) ({ data, error } = await supabase.from('products').insert(rows).select('id'))
         if (error) throw error
         onSaved((data ?? []).map((r) => r.id))
       }
@@ -248,6 +265,9 @@ export function ProductFormSheet({ open, onClose, catalog, product, onSaved }: {
                 <NumInput value={s.mrp} onChangeText={(v) => patch(key(s), { mrp: v })} placeholder="0" />
               </Field>
             </Row>
+            <Field label={t('saleRateCredit')} optional hint={t('saleCreditRateHint')}>
+              <NumInput value={s.credit} onChangeText={(v) => patch(key(s), { credit: v })} placeholder="0" />
+            </Field>
           </View>
         ))}
 

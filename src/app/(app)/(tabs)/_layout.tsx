@@ -12,8 +12,9 @@ import { softShadow, useLayout } from '@/lib/responsive'
 import { useTheme } from '@/lib/theme'
 
 export default function TabsLayout() {
+  // no cross-fade between tabs: an interrupted opacity animation left Android screens looking faded
   return (
-    <Tabs screenOptions={{ headerShown: false, animation: 'shift' }} tabBar={(p) => <TabBar {...p} />}>
+    <Tabs screenOptions={{ headerShown: false, animation: 'none' }} tabBar={(p) => <TabBar {...p} />}>
       <Tabs.Screen name="index" />
       <Tabs.Screen name="products" />
       <Tabs.Screen name="khata" />

@@ -51,7 +51,8 @@ export function StatTile({
     </>
   )
   const shell: StyleProp<ViewStyle> = [
-    { flex: 1, backgroundColor: c.surface, borderRadius: 22, padding: 14, borderWidth: 1, borderColor: c.border, overflow: 'hidden' },
+    // alignSelf stretch: tiles side by side are always the same height, even when only one has a sub line
+    { flex: 1, alignSelf: 'stretch', backgroundColor: c.surface, borderRadius: 22, padding: 14, borderWidth: 1, borderColor: c.border, overflow: 'hidden' },
     !c.dark && softShadow(c.shadow, 0.05, 12, 4),
     style,
   ]

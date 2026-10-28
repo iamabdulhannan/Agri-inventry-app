@@ -1,33 +1,36 @@
 import { router, useLocalSearchParams } from 'expo-router'
-import { CalendarDays, Check, ChevronDown, ChevronRight, Pencil, Plus, Trash2, Truck, Undo2 } from 'lucide-react-native'
+import { CalendarDays, Check, ChevronDown, ChevronRight, HandCoins, Pencil, Plus, Trash2, Truck, Undo2 } from 'lucide-react-native'
 import { useEffect, useMemo, useState } from 'react'
 import { Pressable, ScrollView, View } from 'react-native'
 import { BalanceBadge, PartyAvatar, PartyPickerSheet, ProductAvatar, ProductPickerSheet, usePackLabel } from '@/components/domain'
 import { PartyFormSheet, ProductFormSheet } from '@/components/forms'
+import { AccountPicker, useHasAccounts } from '@/components/money'
 import {
-  Button, CalendarSheet, Card, DateField, ErrorBox, Field, IconBtn, IconTile, Input, Loading, NumInput, PressScale, Row, Screen, Segmented, Stepper, Txt, useFeedback, Rise } from '@/components/ui'
+  Button, CalendarSheet, Card, DateField, ErrorBox, Field, IconBtn, IconTile, Input, Loading, NumInput, PressScale, Row, Screen, Segmented, Select, Stepper, Txt, useFeedback, Rise } from '@/components/ui'
 import { useOrg } from '@/lib/app'
 import { loadBatches, loadCatalog, loadParties } from '@/lib/catalog'
 import { useLoad } from '@/lib/data'
 import { errText } from '@/lib/errors'
 import { daysBetween, fmtDate } from '@/lib/format'
 import { useI18n } from '@/lib/i18n'
+import { loadInvestors, type InvestorRow } from '@/lib/investors'
 import { fmtMoney, r2 } from '@/lib/money'
 import { supabase } from '@/lib/supabase'
 import { useTheme } from '@/lib/theme'
 import type { BatchStock } from '@/lib/types'
-import { fmtTotal } from '@/lib/units'
+import { fmtNum, fmtTotal } from '@/lib/units'
 
 type Kind = 'purchase' | 'opening' | 'return_in'
-interface Line { key: number; product_id: string; batch_no: string; mfg_date: string; expiry_date: string; qty: string; rate: string }
+/** inv_id: investor who owns part of this line ('' = shop only) */
+interface Line { key: number; product_id: string; batch_no: string; mfg_date: string; expiry_date: string; qty: string; rate: string; inv_id: string; inv_qty: string }
 const rateOf = (n?: number | null) => (Number(n) > 0 ? String(Number(n)) : '')
 let seq = 1
-const blank = (product_id = '', rate = ''): Line => ({ key: seq++, product_id, batch_no: '', mfg_date: '', expiry_date: '', qty: '', rate })
+const blank = (product_id = '', rate = ''): Line => ({ key: seq++, product_id, batch_no: '', mfg_date: '', expiry_date: '', qty: '', rate, inv_id: '', inv_qty: '' })
 
 export default function StockIn() {
   const { t, lang, pick } = useI18n()
   const { c } = useTheme()
-  const { org, today, refresh, version } = useOrg()
+  const { org, today, refresh, version, isAdmin } = useOrg()
   const { toast } = useFeedback()
   const label = usePackLabel()
   const params = useLocalSearchParams<{ product?: string; edit?: string; type?: string }>()
@@ -36,12 +39,17 @@ export default function StockIn() {
     const [catalog, batches, suppliers] = await Promise.all([loadCatalog(org.id), loadBatches(org.id, false), loadParties(org.id, 'supplier')])
     return { catalog, batches, suppliers }
   }, [org.id, version])
+  // investors (owner/admin): a purchase line can be partly / fully theirs
+  const { data: investors } = useLoad(async () => (isAdmin ? loadInvestors(org.id).catch(() => [] as InvestorRow[]) : []), [org.id, version, isAdmin])
+  const activeInvestors = (investors ?? []).filter((x) => x.is_active)
+  const hasAccounts = useHasAccounts()
 
   const [kind, setKind] = useState<Kind>(params.type === 'return_in' ? 'return_in' : params.type === 'opening' ? 'opening' : 'purchase')
   const [date, setDate] = useState(today)
   const [partyId, setPartyId] = useState('')
   const [party, setParty] = useState('')
   const [paid, setPaid] = useState('')
+  const [account, setAccount] = useState('') // paid from: '' = cash in hand
   const [reference, setReference] = useState('')
   const [note, setNote] = useState('')
   const [lines, setLines] = useState<Line[]>([])
@@ -95,6 +103,8 @@ export default function StockIn() {
         expiry_date: m.batches.expiry_date,
         qty: String(Number(m.qty)),
         rate: m.unit_price == null ? '' : String(Number(m.unit_price)),
+        inv_id: '',
+        inv_qty: '',
       })))
       setEditing({ id: pur.id, no: pur.purchase_no })
     })()
@@ -118,6 +128,9 @@ export default function StockIn() {
   const paidNum = paid === '' ? (partyId ? 0 : total) : Number(paid) || 0
   const due = r2(total - paidNum)
   const set = (key: number, patch: Partial<Line>) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)))
+  /** cost of one pack for the investor: the line's rate, else the product's purchase rate */
+  const lineRate = (l: Line) => (l.rate !== '' ? Number(l.rate) || 0 : Number(catalog.byId.get(l.product_id)?.purchase_price) || 0)
+  const canSplit = !editing && (isPurchase || kind === 'opening') && activeInvestors.length > 0
 
   // no supplier chosen or typed: use the company of the items as the supplier name
   const supplierName = () => {
@@ -145,6 +158,17 @@ export default function StockIn() {
       if (l.mfg_date && l.mfg_date > l.expiry_date) return setErr(`${t('mfgDate')} > ${t('expiryDate')}`)
       if (l.rate !== '' && !(Number(l.rate) >= 0)) return setErr(t('errInvalidPrice'))
     }
+    // investor shares: not more than the line, not more than their money
+    const splits = canSplit ? lines.filter((l) => l.inv_id && Number(l.inv_qty) > 0) : []
+    const need = new Map<string, number>()
+    for (const l of splits) {
+      if (Number(l.inv_qty) > Number(l.qty) + 0.000001) return setErr(`${t('invShareLine')}: ${t('invShareTooMuch')}`)
+      need.set(l.inv_id, (need.get(l.inv_id) ?? 0) + Number(l.inv_qty) * lineRate(l))
+    }
+    for (const [id, amt] of need) {
+      const inv = activeInvestors.find((x) => x.id === id)
+      if (inv && amt > inv.available + 0.005) return setErr(t('invShareNoFunds', { name: inv.name, avail: fmtMoney(inv.available, lang) }))
+    }
     if (isPurchase && (paidNum < 0 || paidNum > total)) return setErr(t('errInvalidPaid'))
     if (isPurchase && due > 0 && !partyId) return setErr(t('errCreditNeedsParty'))
     setBusy(true)
@@ -171,15 +195,34 @@ export default function StockIn() {
       p_party_id: isPurchase && partyId ? partyId : null,
       p_paid: isPurchase ? paidNum : null,
       p_opening: kind === 'opening',
+      // only sent when used, so purchases still save before migration 013
+      ...(isPurchase && paidNum > 0 && account ? { p_account: account } : {}),
     })
-    setBusy(false)
-    if (error) return setErr(errText(error, t))
+    if (error) {
+      setBusy(false)
+      return setErr(errText(error, t))
+    }
     let msg = t('stockInSaved')
     if (n) {
       const { data: pur } = await supabase.from('purchases').select('purchase_no').eq('id', n as string).single()
       if (pur) msg = t('purchaseSaved', { n: pur.purchase_no })
     }
     toast(msg)
+    // put the investors' part of the lines in their names
+    let done = 0
+    for (const l of splits) {
+      const { error: e2 } = await supabase.rpc('assign_investor_stock', {
+        p_org: org.id, p_investor: l.inv_id, p_product: l.product_id, p_qty: Number(l.inv_qty), p_unit_cost: lineRate(l),
+        p_date: date, p_purchase: (n as string | null) ?? null, p_note: reference || null,
+      })
+      if (e2) {
+        toast(t('invShareFailed', { msg: errText(e2, t) }), 'err')
+        break
+      }
+      done++
+    }
+    if (done) toast(t('invShareSaved', { n: done }))
+    setBusy(false)
     refresh()
     router.back()
   }
@@ -319,6 +362,35 @@ export default function StockIn() {
                     <DateField value={l.mfg_date} onChange={(d) => set(l.key, { mfg_date: d })} max={today} label={t('mfgDate')} placeholder={t('mfgDate')} />
                   </Field>
                 )}
+                {canSplit && (() => {
+                  const inv = activeInvestors.find((x) => x.id === l.inv_id)
+                  const cost = (Number(l.inv_qty) || 0) * lineRate(l)
+                  const over = Number(l.inv_qty) > Number(l.qty) + 0.000001
+                  return (
+                    <View style={{ gap: 10, padding: 12, borderRadius: 16, backgroundColor: c.blueSoft }}>
+                      <Field label={t('invShareLine')}>
+                        <Select
+                          title={t('invShareLine')}
+                          value={l.inv_id}
+                          icon={<HandCoins size={18} color={c.blue} />}
+                          onChange={(v) => set(l.key, { inv_id: v, inv_qty: v && !l.inv_qty ? l.qty : v ? l.inv_qty : '' })}
+                          options={[{ value: '', label: t('invShareNone') }, ...activeInvestors.map((x) => ({ value: x.id, label: x.name, sub: fmtMoney(x.available, lang) }))]}
+                        />
+                      </Field>
+                      {inv && (
+                        <>
+                          <Field label={t('invShareQty')} error={over ? t('invShareTooMuch') : undefined}>
+                            <NumInput value={l.inv_qty} onChangeText={(v) => set(l.key, { inv_qty: v })} placeholder="0" />
+                          </Field>
+                          <Txt v="tiny" color={cost > inv.available + 0.005 ? c.red : c.textSoft}>
+                            {t('invShareCost', { amount: fmtMoney(cost, lang), name: inv.name, avail: fmtMoney(inv.available, lang) })}
+                            {Number(l.qty) > Number(l.inv_qty) && Number(l.inv_qty) > 0 ? ` · ${t('invShareNone')}: ${fmtNum(Number(l.qty) - Number(l.inv_qty), 3)}` : ''}
+                          </Txt>
+                        </>
+                      )}
+                    </View>
+                  )
+                })()}
               </Card>
             </Rise>
           )
@@ -340,6 +412,12 @@ export default function StockIn() {
               onChange={(v) => setPaid(v === 'full' ? String(total) : '0')}
               items={[{ value: 'full', label: t('fullPayment') }, { value: 'credit', label: t('onCredit') }]}
             />
+          )}
+          {/* editing keeps the account of the original payment (server side) */}
+          {!editing && hasAccounts && paidNum > 0 && (
+            <Field label={t('salePaidFrom')}>
+              <AccountPicker value={account} onChange={setAccount} title={t('salePaidFrom')} />
+            </Field>
           )}
           <Row between style={{ padding: 12, borderRadius: 16, backgroundColor: due > 0 ? c.amberSoft : c.surface2 }}>
             <Txt v="small" muted>{t('balanceDue')}</Txt>

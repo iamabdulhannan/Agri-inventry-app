@@ -2,8 +2,8 @@ import Constants from 'expo-constants'
 import { router, type Href } from 'expo-router'
 import { LinearGradient } from 'expo-linear-gradient'
 import {
-  ArrowDownToLine, BarChart3, CalendarClock, ChevronRight, FileText, History, Languages, LogOut, Moon, NotebookPen, PackageMinus,
-  Settings, Shapes, Smartphone, Sun, Undo2, Users,
+  ArrowDownToLine, BarChart3, CalendarClock, ChevronRight, FileText, HandCoins, History, Landmark, Languages, LogOut, Moon, NotebookPen, PackageMinus,
+  Settings, Shapes, ShieldCheck, Smartphone, Sun, Undo2, Users,
 } from 'lucide-react-native'
 import { StyleSheet, View } from 'react-native'
 import { LogoBadge } from '@/components/Logo'
@@ -18,10 +18,13 @@ export default function More() {
   const { profile, org, role, isAdmin, signOut, session } = useOrg()
   const { confirm } = useFeedback()
 
-  const tiles: { icon: typeof FileText; label: string; sub?: string; tone: Tone; href: Href }[] = [
+  const tiles: { icon: typeof FileText; label: string; sub?: string; tone: Tone; href: Href; show?: boolean }[] = [
     { icon: ArrowDownToLine, label: t('navStockIn'), sub: t('stockInMore'), tone: 'green', href: '/stock-in' },
     { icon: FileText, label: t('invoices'), sub: `${t('invoices')} · ${t('purchases')}`, tone: 'blue', href: '/invoices' },
     { icon: NotebookPen, label: t('navRoznamcha'), sub: t('cashBook'), tone: 'violet', href: '/roznamcha' },
+    { icon: Landmark, label: t('bankTitle'), sub: t('mMoreBankSub'), tone: 'blue', href: '/bank' as Href },
+    { icon: HandCoins, label: t('navInvestors'), sub: t('mMoreInvestSub'), tone: 'green', href: '/investors' as Href, show: isAdmin },
+    { icon: ShieldCheck, label: t('navAudit'), sub: t('mMoreAuditSub'), tone: 'stone', href: '/audit' as Href, show: isAdmin },
     { icon: CalendarClock, label: t('navExpiry'), sub: t('expiryReport'), tone: 'amber', href: '/expiry' },
     { icon: BarChart3, label: t('navReports'), sub: t('salesProfit'), tone: 'primary', href: '/reports' },
     { icon: History, label: t('navLedger'), sub: t('entries'), tone: 'stone', href: '/history' },
@@ -55,7 +58,7 @@ export default function More() {
       <Rise i={1}>
         <SectionTitle>{t('yourBusiness')}</SectionTitle>
         <Grid>
-          {tiles.map(({ icon: Icon, label, sub, tone, href }) => {
+          {tiles.filter((x) => x.show !== false).map(({ icon: Icon, label, sub, tone, href }) => {
             const tc = toneColors(c, tone)
             return (
               <PressScale key={label} onPress={() => router.push(href)} style={[styles.tile, { flex: 1, backgroundColor: c.surface, borderColor: c.border }]}>

@@ -42,6 +42,8 @@ export function Input({
           flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: c.surface, borderRadius: radius.md, borderWidth: 1.5,
           borderColor: invalid ? c.red : focus ? c.primary : c.border, paddingHorizontal: 14, height: big ? 60 : 50,
         },
+        // multi-line: grows with the text (min 3 lines) instead of a fixed height
+        rest.multiline && { height: undefined, minHeight: 96, alignItems: 'flex-start', paddingVertical: 12 },
         style,
       ]}
     >
@@ -59,7 +61,10 @@ export function Input({
           setFocus(false)
           rest.onBlur?.(e)
         }}
-        style={{ flex: 1, minWidth: 0, color: c.text, fontFamily: fonts.semibold, fontSize: big ? 22 : 15.5, height: '100%', paddingVertical: 0 }}
+        style={[
+          { flex: 1, minWidth: 0, color: c.text, fontFamily: fonts.semibold, fontSize: big ? 22 : 15.5, height: '100%', paddingVertical: 0 },
+          rest.multiline && { height: undefined, minHeight: 72, textAlignVertical: 'top' },
+        ]}
       />
       {suffix}
     </View>

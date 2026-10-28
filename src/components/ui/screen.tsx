@@ -1,7 +1,7 @@
 import { router } from 'expo-router'
 import { LinearGradient } from 'expo-linear-gradient'
 import { ArrowLeft, Inbox, RefreshCw, WifiOff } from 'lucide-react-native'
-import { useEffect, useState, type ReactNode } from 'react'
+import { Children, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Animated, Easing, RefreshControl, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { errText } from '@/lib/errors'
@@ -143,17 +143,33 @@ export function ErrorBox({ error, children, onRetry }: { error?: unknown; childr
 }
 
 /** Horizontal scroller that runs edge to edge (past the screen gutter) on every screen size */
-export function HScroll({ children, gap = 8, style }: { children: ReactNode; gap?: number; style?: StyleProp<ViewStyle> }) {
+export function HScroll({ children, gap = 8, style, focus }: { children: ReactNode; gap?: number; style?: StyleProp<ViewStyle>; focus?: number }) {
   const { width, contentWidth } = useLayout()
   const side = (width - contentWidth) / 2
+  const ref = useRef<ScrollView>(null)
+  const xs = useRef<number[]>([])
+  const [laid, setLaid] = useState(0)
+  // keep the selected item (e.g. a filter chip opened from a link) on screen
+  useEffect(() => {
+    if (focus == null || focus < 0) return
+    const x = xs.current[focus]
+    if (x != null) ref.current?.scrollTo({ x: Math.max(0, x - side - 24), animated: true })
+  }, [focus, laid, side])
   return (
     <ScrollView
+      ref={ref}
       horizontal
       showsHorizontalScrollIndicator={false}
       style={[{ marginHorizontal: -side, flexGrow: 0 }, style]}
       contentContainerStyle={{ gap, paddingHorizontal: side }}
     >
-      {children}
+      {focus == null
+        ? children
+        : Children.toArray(children).map((child, i) => (
+            <View key={i} onLayout={(e) => { xs.current[i] = e.nativeEvent.layout.x; if (i === focus) setLaid((n) => n + 1) }}>
+              {child}
+            </View>
+          ))}
     </ScrollView>
   )
 }

@@ -3,7 +3,7 @@ import { router, useLocalSearchParams } from 'expo-router'
 import * as Sharing from 'expo-sharing'
 import { CheckCircle2, Plus, Printer, Share2, X } from 'lucide-react-native'
 import { useEffect, useState } from 'react'
-import { ScrollView, StyleSheet, View } from 'react-native'
+import { ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Button, ErrorBox, IconBtn, Loading, Row, Segmented, Txt, haptic, useFeedback } from '@/components/ui'
 import { useOrg } from '@/lib/app'
@@ -13,7 +13,8 @@ import { fmtDate } from '@/lib/format'
 import { useI18n } from '@/lib/i18n'
 import { fmtMoney } from '@/lib/money'
 import { prefs } from '@/lib/prefs'
-import { loadReceipt, receiptHtml } from '@/lib/receipt'
+import { loadReceipt, receiptHtml, saleDueOf } from '@/lib/receipt'
+import { receiptNoteOf } from '@/lib/receiptNote'
 import { useTheme } from '@/lib/theme'
 import { fmtNum, fmtPack, unitLabel } from '@/lib/units'
 
@@ -91,6 +92,7 @@ export default function Receipt() {
                 <Txt v="h2" color={INK} align="center">{org.name}</Txt>
                 {!!org.address && <Txt v="small" color="#3B463E" align="center">{org.address}</Txt>}
                 {!!org.phone && <Txt v="small" color="#3B463E" align="center">{org.phone}</Txt>}
+                {!!org.ntn && <Txt v="tiny" color="#3B463E" align="center">NTN {org.ntn}</Txt>}
                 <Dash />
                 <Row between>
                   <Txt v="small" color={INK}>{t('invoiceNum')} <Txt v="small" weight="extrabold" color={INK}>{data.sale.invoice_no}</Txt></Txt>
@@ -112,9 +114,14 @@ export default function Receipt() {
                 <Dash />
                 <Line k={t('subtotal')} v={fmtMoney(data.sale.subtotal, lang)} />
                 {Number(data.sale.discount) > 0 && <Line k={t('discount')} v={`- ${fmtMoney(data.sale.discount, lang)}`} />}
+                {Number(data.sale.markup ?? 0) > 0 && <Line k={t('saleMarkup')} v={`+ ${fmtMoney(Number(data.sale.markup), lang)}`} />}
                 <Line k={t('grandTotal')} v={fmtMoney(data.sale.total, lang)} big />
-                <Line k={t('received')} v={fmtMoney(data.sale.paid, lang)} />
-                {Number(data.sale.total) - Number(data.sale.paid) > 0 && <Line k={t('balanceDue')} v={fmtMoney(Number(data.sale.total) - Number(data.sale.paid), lang)} bold />}
+                {Number(data.sale.advance_used ?? 0) > 0 && (
+                  <Line k={`${t('salePaidFromAdvance')}${data.advance ? ` (${data.advance})` : ''}`} v={fmtMoney(Number(data.sale.advance_used), lang)} />
+                )}
+                <Line k={`${t('received')}${data.account ? ` (${data.account})` : ''}`} v={fmtMoney(data.sale.paid, lang)} />
+                {saleDueOf(data.sale) > 0 && <Line k={t('balanceDue')} v={fmtMoney(saleDueOf(data.sale), lang)} bold />}
+                {saleDueOf(data.sale) > 0 && !!data.sale.due_date && <Line k={t('salePayBy')} v={fmtDate(data.sale.due_date, lang)} />}
                 {data.party && (
                   <>
                     <Dash />
@@ -124,6 +131,7 @@ export default function Receipt() {
                 <Dash />
                 {!!data.sale.created_by_name && <Txt v="tiny" color="#556158" align="center">{t('servedBy')}: {data.sale.created_by_name}</Txt>}
                 <Txt v="small" weight="extrabold" color={INK} align="center" style={{ marginTop: 4 }}>{t('thankYou')}</Txt>
+                <Text style={{ marginTop: 8, color: '#3B463E', fontSize: 12, lineHeight: 24, textAlign: 'right', writingDirection: 'rtl' }}>نوٹ: {receiptNoteOf(org)}</Text>
               </View>
               <Zigzag />
             </View>

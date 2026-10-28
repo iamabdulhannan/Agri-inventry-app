@@ -1,4 +1,5 @@
 import { fmtDate } from './format'
+import { receiptNoteOf } from './receiptNote'
 import type { Lang, TFn } from './i18n'
 import { fmtMoney } from './money'
 import { supabase } from './supabase'
@@ -16,11 +17,20 @@ export interface ReceiptLine {
   /** bag sold loose: qty in kg, rate per kg */
   loose: boolean
 }
+/** sale row incl. the credit-sale columns (migration 013) */
+export type ReceiptSale = Sale & { markup?: number | null; advance_used?: number | null; advance_id?: string | null; due_date?: string | null }
 export interface ReceiptData {
-  sale: Sale
+  sale: ReceiptSale
   lines: ReceiptLine[]
   party: { name: string; phone: string | null; balance: number } | null
+  /** crop advance the bill was partly paid from ("Wheat Rabi 2025-26") */
+  advance: string | null
+  /** bank account / wallet the money went into (null = cash in hand) */
+  account: string | null
 }
+
+/** what is still owed on the bill */
+export const saleDueOf = (s: ReceiptSale) => Math.max(0, Number(s.total) - Number(s.paid) - Number(s.advance_used ?? 0))
 
 export async function loadReceipt(saleId: string): Promise<ReceiptData> {
   const [{ data: sale, error: e1 }, { data: moves, error: e2 }] = await Promise.all([
@@ -54,7 +64,20 @@ export async function loadReceipt(saleId: string): Promise<ReceiptData> {
     const { data } = await supabase.from('party_balances').select('name, phone, balance').eq('id', sale.party_id).single()
     if (data) party = { ...data, balance: Number(data.balance) }
   }
-  return { sale: sale as Sale, lines: [...map.values()], party }
+  // optional extras: crop advance and the account the money went into (empty before migration 013)
+  let advance: string | null = null
+  let account: string | null = null
+  const extra = sale as ReceiptSale
+  if (extra.advance_id) {
+    const { data: a } = await supabase.from('crop_advances').select('crop, season').eq('id', extra.advance_id).maybeSingle()
+    if (a) advance = [a.crop, a.season].filter(Boolean).join(' ') || null
+  }
+  const { data: ce, error: ceErr } = await supabase.from('cash_entries').select('account_id').eq('sale_id', saleId).eq('kind', 'sale').not('account_id', 'is', null).limit(1)
+  if (!ceErr && ce?.[0]?.account_id) {
+    const { data: acc } = await supabase.from('money_accounts').select('name').eq('id', ce[0].account_id).maybeSingle()
+    account = acc?.name ?? null
+  }
+  return { sale: sale as ReceiptSale, lines: [...map.values()], party, advance, account }
 }
 
 const esc = (s: string | null | undefined) => String(s ?? '').replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]!)
@@ -62,7 +85,9 @@ const esc = (s: string | null | undefined) => String(s ?? '').replace(/[&<>"]/g,
 /** HTML for printing / PDF sharing: 80 mm thermal or A4 */
 export function receiptHtml(d: ReceiptData, org: Organization, t: TFn, lang: Lang, pick: (en: string, ur?: string | null) => string, paper: '80mm' | 'a4') {
   const { sale, lines, party } = d
-  const due = Number(sale.total) - Number(sale.paid)
+  const due = saleDueOf(sale)
+  const markup = Number(sale.markup ?? 0)
+  const advUsed = Number(sale.advance_used ?? 0)
   const time = new Date(sale.created_at).toLocaleTimeString(lang === 'ur' ? 'ur-PK' : 'en-GB', { hour: '2-digit', minute: '2-digit' })
   const m = (n: number) => esc(fmtMoney(n, lang))
   const row = (a: string, b: string, cls = '') => `<div class="row ${cls}"><span>${a}</span><span>${b}</span></div>`
@@ -86,10 +111,12 @@ export function receiptHtml(d: ReceiptData, org: Organization, t: TFn, lang: Lan
   th { text-align: start; border-bottom: 1px solid #000; font-weight: 700; padding: 2px 0; }
   td { vertical-align: top; padding: 2px 0; } .r { text-align: end; white-space: nowrap; padding-inline-start: 4px; }
   .sub { font-size: .85em; color: #333; }
+  .note { margin-top: 6px; font-size: .9em; line-height: 1.9; text-align: right; font-family: "Noto Nastaliq Urdu", "Jameel Noori Nastaleeq", serif; }
 </style></head><body><div class="wrap">
   <div class="c b big">${esc(org.name)}</div>
   ${org.address ? `<div class="c">${esc(org.address)}</div>` : ''}
   ${org.phone ? `<div class="c" dir="ltr">${esc(org.phone)}</div>` : ''}
+  ${org.ntn ? `<div class="c" dir="ltr">NTN ${esc(org.ntn)}</div>` : ''}
   <div class="hr"></div>
   ${row(`${esc(t('invoiceNum'))} <b>${sale.invoice_no}</b>`, `${esc(fmtDate(sale.sale_date, lang))} ${esc(time)}`)}
   <div>${esc(t('customer'))}: <b>${esc(party?.name ?? sale.customer_name ?? t('walkIn'))}</b>${party?.phone ? ` · ${esc(party.phone)}` : ''}</div>
@@ -98,12 +125,16 @@ export function receiptHtml(d: ReceiptData, org: Organization, t: TFn, lang: Lan
   <div class="hr"></div>
   ${row(esc(t('subtotal')), m(sale.subtotal))}
   ${Number(sale.discount) > 0 ? row(esc(t('discount')), `- ${m(sale.discount)}`) : ''}
+  ${markup > 0 ? row(esc(t('saleMarkup')), `+ ${m(markup)}`) : ''}
   ${row(esc(t('grandTotal')), m(sale.total), 'tot')}
-  ${row(esc(t('received')), m(sale.paid))}
+  ${advUsed > 0 ? row(esc(t('salePaidFromAdvance')) + (d.advance ? ` (${esc(d.advance)})` : ''), m(advUsed)) : ''}
+  ${row(esc(t('received')) + (d.account ? ` (${esc(d.account)})` : ''), m(sale.paid))}
   ${due > 0 ? row(`<b>${esc(t('balanceDue'))}</b>`, `<b>${m(due)}</b>`) : ''}
+  ${due > 0 && sale.due_date ? row(esc(t('salePayBy')), esc(fmtDate(sale.due_date, lang))) : ''}
   ${party ? `<div class="hr"></div>${row(`<b>${esc(t('khataAccount'))} ${esc(t('balance'))}</b>`, `<b>${m(party.balance)}</b>`)}` : ''}
   <div class="hr"></div>
   ${sale.created_by_name ? `<div class="c">${esc(t('servedBy'))}: ${esc(sale.created_by_name)}</div>` : ''}
   <div class="c b" style="margin-top:4px">${esc(t('thankYou'))}</div>
+  <div class="note" dir="rtl">نوٹ: ${esc(receiptNoteOf(org))}</div>
 </div></body></html>`
 }

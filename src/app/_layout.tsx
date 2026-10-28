@@ -56,7 +56,7 @@ function Root() {
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <StatusBar style={splash || c.dark ? 'light' : 'dark'} />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.bg }, animation: 'fade_from_bottom' }}>
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.bg }, animation: 'slide_from_right' }}>
         <Stack.Protected guard={!session}>
           <Stack.Screen name="(auth)" />
         </Stack.Protected>

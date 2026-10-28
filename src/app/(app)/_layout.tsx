@@ -5,7 +5,8 @@ export default function AppLayout() {
   const { c } = useTheme()
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.bg }, animation: 'slide_from_right' }}>
-      <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
+      {/* slides only (transform), never fades: an interrupted fade could leave a screen half-transparent on Android */}
+      <Stack.Screen name="(tabs)" options={{ animation: 'none' }} />
       <Stack.Screen name="sale" options={{ animation: 'slide_from_bottom' }} />
       <Stack.Screen name="stock-in" options={{ animation: 'slide_from_bottom' }} />
       <Stack.Screen name="receipt/[id]" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />

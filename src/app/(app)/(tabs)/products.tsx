@@ -8,6 +8,7 @@ import { Ambient, Chip, Empty, ErrorBox, IconBtn, Loading, PickerSheet, Row, Sea
 import { useOrg } from '@/lib/app'
 import { useLayout } from '@/lib/responsive'
 import { useCatalog } from '@/lib/catalog'
+import { searchProducts } from '@/lib/productSearch'
 import { daysBetween } from '@/lib/format'
 import { useI18n } from '@/lib/i18n'
 import { fmtMoney } from '@/lib/money'
@@ -45,13 +46,12 @@ export default function Products() {
 
   const list = useMemo(() => {
     if (!cat) return []
-    const terms = q.toLowerCase().split(/\s+/).filter(Boolean)
     const rows = cat.products
       .filter((p) => p.is_active || stock === 'all')
       .filter((p) => category === 'all' || p.category_id === category)
       .filter((p) => is(p, stock))
-      .filter((p) => terms.every((x) => `${p.name} ${p.name_ur ?? ''} ${p.company_name ?? ''} ${p.category_name}`.toLowerCase().includes(x)))
-    const s = [...rows]
+    const s = q.trim() ? searchProducts(rows, q) : [...rows]
+    if (q.trim() && sort === 'name') return s // keep best matches first
     if (sort === 'stockHigh') s.sort((a, b) => b.qty - a.qty)
     if (sort === 'stockLow') s.sort((a, b) => a.qty - b.qty)
     if (sort === 'expiry') s.sort((a, b) => (a.next_expiry ?? '9999').localeCompare(b.next_expiry ?? '9999'))

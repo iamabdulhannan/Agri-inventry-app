@@ -2,6 +2,7 @@ import { ArrowDownLeft, ArrowUpRight, Droplets, FlaskConical, Package, Plus, Spr
 import { useEffect, useMemo, useState } from 'react'
 import { FlatList, Pressable, View } from 'react-native'
 import type { Catalog } from '@/lib/catalog'
+import { searchProducts } from '@/lib/productSearch'
 import { daysBetween, fmtDate, fmtDateTime } from '@/lib/format'
 import { useI18n } from '@/lib/i18n'
 import { fmtMoney } from '@/lib/money'
@@ -183,12 +184,12 @@ export function ProductPickerSheet({
     }
   }, [open])
   const list = useMemo(() => {
-    const terms = q.toLowerCase().split(/\s+/).filter(Boolean)
-    return catalog.products
+    const base = catalog.products
       .filter((p) => p.is_active)
       .filter((p) => !inStockOnly || p.qty > 0)
       .filter((p) => cat === 'all' || p.category_id === cat)
-      .filter((p) => terms.every((x) => `${p.name} ${p.name_ur ?? ''} ${p.company_name ?? ''} ${fmtPack(p.pack_size, p.pack_unit)}`.toLowerCase().includes(x)))
+    // ranked search (name start > word start > Urdu > company > pack size ...), like the web app
+    return q.trim() ? searchProducts(base, q).slice(0, 200) : base
   }, [catalog, q, cat, inStockOnly])
   const cats = catalog.categories.filter((cg) => catalog.products.some((p) => p.category_id === cg.id && (!inStockOnly || p.qty > 0)))
 

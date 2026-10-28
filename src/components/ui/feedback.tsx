@@ -1,12 +1,11 @@
 import { AlertTriangle, CheckCircle2, XCircle } from 'lucide-react-native'
-import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react'
-import { View } from 'react-native'
-import Animated, { FadeInUp, FadeOutUp, LinearTransition } from 'react-native-reanimated'
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { Animated as RNAnimated, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useI18n } from '@/lib/i18n'
 import { radius, useTheme } from '@/lib/theme'
 import { Button, haptic, Txt } from './core'
-import { Sheet } from './sheet'
+import { Sheet, sheetsSettled } from './sheet'
 
 type ToastKind = 'ok' | 'err' | 'warn'
 interface ToastItem { id: number; msg: string; kind: ToastKind }
@@ -37,7 +36,10 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const confirm = useCallback<Feedback['confirm']>(
-    (msg, opts) => new Promise((resolve) => setReq({ msg, danger: opts?.danger ?? true, title: opts?.title, okLabel: opts?.okLabel, resolve })),
+    (msg, opts) =>
+      new Promise((resolve) => {
+        sheetsSettled().then(() => setReq({ msg, danger: opts?.danger ?? true, title: opts?.title, okLabel: opts?.okLabel, resolve }))
+      }),
     [],
   )
   const answer = (v: boolean) => {
@@ -53,19 +55,10 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
           const color = x.kind === 'ok' ? c.green : x.kind === 'err' ? c.red : c.amber
           const Icon = x.kind === 'ok' ? CheckCircle2 : x.kind === 'err' ? XCircle : AlertTriangle
           return (
-            <Animated.View
-              key={x.id}
-              entering={FadeInUp.springify().damping(16)}
-              exiting={FadeOutUp.duration(220)}
-              layout={LinearTransition}
-              style={{
-                flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: c.dark ? '#102318' : '#0F2A1A', paddingVertical: 13, paddingHorizontal: 16,
-                borderRadius: radius.lg, borderWidth: 1, borderColor: color + '55',
-              }}
-            >
+            <ToastCard key={x.id} border={color + '55'} bg={c.dark ? '#102318' : '#0F2A1A'}>
               <Icon size={20} color={color} />
               <Txt v="small" weight="semibold" color="#ECF7EF" style={{ flex: 1 }}>{x.msg}</Txt>
-            </Animated.View>
+            </ToastCard>
           )
         })}
       </View>
@@ -90,4 +83,25 @@ export function useFeedback() {
   const v = useContext(Ctx)
   if (!v) throw new Error('useFeedback outside provider')
   return v
+}
+
+/**
+ * Always fully opaque: it only slides in (native-driver transform), so a dropped animation
+ * can never leave a half-faded toast over the screen.
+ */
+function ToastCard({ children, bg, border }: { children: ReactNode; bg: string; border: string }) {
+  const [y] = useState(() => new RNAnimated.Value(-24))
+  useEffect(() => {
+    RNAnimated.spring(y, { toValue: 0, useNativeDriver: true, damping: 16, stiffness: 220, mass: 0.8 }).start()
+  }, [y])
+  return (
+    <RNAnimated.View
+      style={{
+        flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: bg, paddingVertical: 13, paddingHorizontal: 16,
+        borderRadius: radius.lg, borderWidth: 1, borderColor: border, transform: [{ translateY: y }],
+      }}
+    >
+      {children}
+    </RNAnimated.View>
+  )
 }
