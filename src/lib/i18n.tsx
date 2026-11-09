@@ -16,7 +16,7 @@ export type Lang = 'en' | 'ur'
 
 const en = {
   ...mobileEn, ...mBankEn, ...mKhataEn, ...mInvestEn, ...mAuditEn, ...bankEn, ...saleEn, ...khataEn, ...investEn, ...offlineEn,
-  appName: 'Agri Inventory',
+  appName: 'ZaraiBook',
   tagline: 'Stock & expiry control for pesticides, fertilizers and seeds',
 
   // common
@@ -221,7 +221,7 @@ const en = {
   auditNoteValuation: 'Stock is valued at cost: the average purchase rate of each batch (or the product purchase rate when a batch has no rate).',
   auditNoteWrittenOff: 'Damaged and expired stock written off: {amount} (included in cost of goods sold).',
   auditNoteNegativeCash: 'Cash is below zero because the opening cash was never entered. Add it in Roznamcha (Cash in) on your first day.',
-  auditDisclaimer: 'Prepared from Agri Inventory records. Please review with your accountant or tax advisor before filing.',
+  auditDisclaimer: 'Prepared from ZaraiBook records. Please review with your accountant or tax advisor before filing.',
   purchaseNum: 'Purchase #',
   billRefCol: 'Bill no.',
   returnWord: 'Return',
@@ -333,7 +333,7 @@ const en = {
   alertDays: 'Expiry alert (days before)', alertDaysHint: 'Items are flagged this many days before expiry. Default 60 (2 months).',
   members: 'Members', role: 'Role', invites: 'Invite codes', createInvite: 'Create invite code',
   inviteEmail: 'Only for this email', inviteCreated: 'Invite code created',
-  shareInvite: 'Join {org} on Agri Inventory.\nOpen {url}, choose "Join organization" and enter code: {code}',
+  shareInvite: 'Join {org} on ZaraiBook.\nOpen {url}, choose "Join organization" and enter code: {code}',
   expires: 'Expires', categories: 'Categories', companies: 'Companies', addCategory: 'Add category',
   addCompany: 'Add company', profile: 'My profile', language: 'Language',
  
@@ -349,7 +349,7 @@ export type TKey = keyof typeof en
 
 const ur: Record<TKey, string> = {
   ...mobileUr, ...mBankUr, ...mKhataUr, ...mInvestUr, ...mAuditUr, ...bankUr, ...saleUr, ...khataUr, ...investUr, ...offlineUr,
-  appName: 'زرعی انوینٹری',
+  appName: 'زرعی بک',
   tagline: 'زرعی ادویات، کھاد اور بیج کا اسٹاک اور ایکسپائری کنٹرول',
 
   save: 'محفوظ کریں', cancel: 'منسوخ', close: 'بند کریں', edit: 'ترمیم', delete: 'حذف کریں', add: 'شامل کریں',
@@ -540,7 +540,7 @@ const ur: Record<TKey, string> = {
   auditNoteValuation: 'اسٹاک لاگت پر لگایا گیا ہے: ہر بیچ کا اوسط خریداری ریٹ (یا جس بیچ کا ریٹ نہ ہو اس کا پروڈکٹ خریداری ریٹ)۔',
   auditNoteWrittenOff: 'خراب اور ایکسپائر اسٹاک: {amount} (فروخت شدہ مال کی لاگت میں شامل)۔',
   auditNoteNegativeCash: 'نقد صفر سے کم ہے کیونکہ ابتدائی نقد درج نہیں کیا گیا۔ روزنامچہ میں پہلے دن کی تاریخ پر "نقد آمد" درج کریں۔',
-  auditDisclaimer: 'یہ رپورٹ ایگری انوینٹری کے ریکارڈ سے بنی ہے۔ ریٹرن جمع کرانے سے پہلے اپنے اکاؤنٹنٹ یا ٹیکس مشیر سے چیک کروائیں۔',
+  auditDisclaimer: 'یہ رپورٹ زرعی بک کے ریکارڈ سے بنی ہے۔ ریٹرن جمع کرانے سے پہلے اپنے اکاؤنٹنٹ یا ٹیکس مشیر سے چیک کروائیں۔',
   purchaseNum: 'خریداری نمبر',
   billRefCol: 'بل نمبر',
   returnWord: 'واپسی',
@@ -651,7 +651,7 @@ const ur: Record<TKey, string> = {
   alertDays: 'ایکسپائری الرٹ (دن پہلے)', alertDaysHint: 'ایکسپائری سے اتنے دن پہلے اشیاء نمایاں ہوں گی۔ ڈیفالٹ 60 (2 ماہ)۔',
   members: 'اراکین', role: 'کردار', invites: 'دعوتی کوڈ', createInvite: 'دعوتی کوڈ بنائیں',
   inviteEmail: 'صرف اس ای میل کے لیے', inviteCreated: 'دعوتی کوڈ بن گیا',
-  shareInvite: 'زرعی انوینٹری پر {org} میں شامل ہوں۔\n{url} کھولیں، "تنظیم میں شامل ہوں" منتخب کریں اور یہ کوڈ درج کریں: {code}',
+  shareInvite: 'زرعی بک پر {org} میں شامل ہوں۔\n{url} کھولیں، "تنظیم میں شامل ہوں" منتخب کریں اور یہ کوڈ درج کریں: {code}',
   expires: 'میعاد', categories: 'اقسام', companies: 'کمپنیاں', addCategory: 'قسم شامل کریں',
   addCompany: 'کمپنی شامل کریں', profile: 'میری پروفائل', language: 'زبان',
  

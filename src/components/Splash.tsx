@@ -189,9 +189,9 @@ export function Splash({ ready, onDone }: { ready: boolean; onDone: () => void }
       <Animated.View style={[styles.wordWrap, textOut]}>
         <View style={{ overflow: 'hidden', paddingHorizontal: 6 }}>
           <View style={{ flexDirection: 'row' }}>
-            {'AGRI'.split('').map((ch, i) => <Letter key={i} ch={ch} i={i} t={word} color="#F2FFF5" />)}
+            {'ZARAI'.split('').map((ch, i) => <Letter key={i} ch={ch} i={i} t={word} color="#F2FFF5" />)}
             <View style={{ width: 10 }} />
-            {'INVENTORY'.split('').map((ch, i) => <Letter key={`b${i}`} ch={ch} i={i + 4} t={word} color={LIME} />)}
+            {'BOOK'.split('').map((ch, i) => <Letter key={`b${i}`} ch={ch} i={i + 5} t={word} color={LIME} />)}
           </View>
           <Animated.View pointerEvents="none" style={[styles.sweep, sweepStyle]}>
             <LinearGradient colors={['transparent', 'rgba(255,255,255,0.55)', 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />

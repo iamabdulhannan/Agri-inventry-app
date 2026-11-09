@@ -1,41 +1,48 @@
 import * as Print from 'expo-print'
 import { router, useLocalSearchParams } from 'expo-router'
-import * as Sharing from 'expo-sharing'
-import { CheckCircle2, Plus, Printer, Share2, X } from 'lucide-react-native'
-import { useEffect, useState } from 'react'
+import { CheckCircle2, ChevronRight, FileText, MessageCircle, MessageSquareText, Plus, Printer, Share2, X } from 'lucide-react-native'
+import { useEffect, useState, type ReactNode } from 'react'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Button, ErrorBox, IconBtn, Loading, Row, Segmented, Txt, haptic, useFeedback } from '@/components/ui'
+import { canWhatsApp } from '@/components/khata/whatsapp'
+import { Button, ErrorBox, IconBtn, Loading, PressScale, Row, Segmented, Sheet, Txt, haptic, useFeedback } from '@/components/ui'
 import { useOrg } from '@/lib/app'
 import { useLoad } from '@/lib/data'
 import { errText } from '@/lib/errors'
 import { fmtDate } from '@/lib/format'
 import { useI18n } from '@/lib/i18n'
 import { fmtMoney } from '@/lib/money'
+import { shareInvoicePdf, shareInvoiceText, whatsappInvoice, type Paper } from '@/lib/invoiceShare'
 import { prefs } from '@/lib/prefs'
 import { loadReceipt, receiptHtml, saleDueOf } from '@/lib/receipt'
 import { receiptNoteOf } from '@/lib/receiptNote'
 import { useTheme } from '@/lib/theme'
 import { fmtNum, fmtPack, unitLabel } from '@/lib/units'
 
-type Paper = '80mm' | 'a4'
 const PAPER_KEY = 'agri.receiptPaper'
 const INK = '#111511'
 
 export default function Receipt() {
-  const { id, fresh } = useLocalSearchParams<{ id: string; fresh?: string }>()
+  const { id, fresh, share: shareParam } = useLocalSearchParams<{ id: string; fresh?: string; share?: string }>()
   const { t, lang, pick } = useI18n()
   const { c } = useTheme()
   const { org } = useOrg()
   const { toast } = useFeedback()
   const insets = useSafeAreaInsets()
   const [paper, setPaper] = useState<Paper>(() => (prefs.get(PAPER_KEY) === 'a4' ? 'a4' : '80mm'))
-  const [busy, setBusy] = useState<'print' | 'share' | null>(null)
+  const [busy, setBusy] = useState<'print' | 'pdf' | 'text' | 'wa' | null>(null)
+  const [sharing, setSharing] = useState(false)
   const { data, error, loading, reload } = useLoad(() => loadReceipt(id), [id])
 
   useEffect(() => {
     if (fresh && data) haptic.success()
   }, [fresh, data])
+  // opened with ?share=1 (e.g. "Share" in the invoices list): show the share choices right away
+  const [autoShared, setAutoShared] = useState(false)
+  if (shareParam && data && !autoShared) {
+    setAutoShared(true)
+    setSharing(true)
+  }
 
   const choosePaper = (p: Paper) => {
     setPaper(p)
@@ -51,16 +58,21 @@ export default function Receipt() {
     }
     setBusy(null)
   }
-  const share = async () => {
-    setBusy('share')
+  /** run one share action from the sheet: the sheet closes first so the system share screen can open */
+  const run = async (kind: 'pdf' | 'text' | 'wa') => {
+    if (!data) return
+    setBusy(kind)
+    setSharing(false)
     try {
-      const { uri } = await Print.printToFileAsync({ html: html(), width: paper === '80mm' ? 227 : 595 })
-      await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: t('shareReceipt'), UTI: 'com.adobe.pdf' })
+      if (kind === 'pdf') await shareInvoicePdf(data, org, t, lang, pick, paper)
+      else if (kind === 'text') await shareInvoiceText(data, org, t, lang, pick)
+      else if (!(await whatsappInvoice(data, org, t, lang, pick))) toast(t('mShareNoWa'), 'warn')
     } catch (e) {
-      toast(errText(e, t), 'err')
+      if (!/cancel|dismiss/i.test(String(e))) toast(errText(e, t), 'err')
     }
     setBusy(null)
   }
+  const waOk = canWhatsApp(data?.party?.phone)
 
   const close = () => (router.canGoBack() ? router.back() : router.replace('/'))
 
@@ -142,15 +154,55 @@ export default function Receipt() {
               items={[{ value: '80mm', label: t('thermal') }, { value: 'a4', label: t('a4') }]}
               style={{ marginTop: 20 }}
             />
-            <Row gap={10} style={{ marginTop: 12 }}>
+            {/* WhatsApp first: that is how most bills reach farmers */}
+            <Button
+              size="lg"
+              title={waOk ? t('mShareWaTo', { name: data.party!.name }) : t('mShareTitle')}
+              icon={waOk ? <MessageCircle size={20} color="#fff" /> : <Share2 size={20} color="#fff" />}
+              onPress={() => (waOk ? run('wa') : setSharing(true))}
+              loading={busy === 'wa'}
+              variant="danger"
+              color="#fff"
+              style={{ marginTop: 12, backgroundColor: WA_DARK }}
+            />
+            <Row gap={10} style={{ marginTop: 10 }}>
               <Button variant="secondary" title={t('printReceipt')} icon={<Printer size={18} color={c.text} />} onPress={print} loading={busy === 'print'} style={{ flex: 1 }} />
-              <Button variant="secondary" title={t('share')} icon={<Share2 size={18} color={c.text} />} onPress={share} loading={busy === 'share'} style={{ flex: 1 }} />
+              <Button variant="secondary" title={t('share')} icon={<Share2 size={18} color={c.text} />} onPress={() => setSharing(true)} loading={busy === 'pdf' || busy === 'text'} style={{ flex: 1 }} />
             </Row>
             <Button size="lg" title={t('sellAgain')} icon={<Plus size={20} color={c.primaryText} />} onPress={() => router.replace('/sale')} style={{ marginTop: 10 }} />
           </>
         )}
       </ScrollView>
+
+      <Sheet open={sharing} onClose={() => setSharing(false)} title={t('mShareTitle')} subtitle={data ? `${t('invoiceNum')} ${data.sale.invoice_no} · ${fmtMoney(data.sale.total, lang)}` : undefined}>
+        <View style={{ gap: 10 }}>
+          <ShareOption icon={<FileText size={22} color={c.red} />} tint={c.redSoft} title={t('mSharePdf')} sub={t('mSharePdfSub')} onPress={() => run('pdf')} />
+          {waOk && (
+            <ShareOption icon={<MessageCircle size={22} color={WA_GREEN} />} tint={WA_GREEN + '22'} title={t('mShareWaTo', { name: data!.party!.name })} sub={t('mShareWaSub')} onPress={() => run('wa')} />
+          )}
+          <ShareOption icon={<MessageSquareText size={22} color={c.blue} />} tint={c.blueSoft} title={t('mShareText')} sub={t('mShareTextSub')} onPress={() => run('text')} />
+          <ShareOption icon={<Printer size={22} color={c.textSoft} />} tint={c.surface2} title={t('printReceipt')} sub={t('mSharePrintSub')} onPress={() => { setSharing(false); print() }} />
+        </View>
+      </Sheet>
     </View>
+  )
+}
+
+const WA_GREEN = '#25D366'
+/** WhatsApp's darker green: white text stays readable on it */
+const WA_DARK = '#128C7E'
+
+function ShareOption({ icon, tint, title, sub, onPress }: { icon: ReactNode; tint: string; title: string; sub: string; onPress: () => void }) {
+  const { c } = useTheme()
+  return (
+    <PressScale onPress={onPress} scaleTo={0.98} style={[styles.option, { backgroundColor: c.surface, borderColor: c.border }]}>
+      <View style={[styles.optionIcon, { backgroundColor: tint }]}>{icon}</View>
+      <View style={{ flex: 1 }}>
+        <Txt weight="bold" numberOfLines={1}>{title}</Txt>
+        <Txt v="tiny" muted numberOfLines={2}>{sub}</Txt>
+      </View>
+      <ChevronRight size={18} color={c.muted} />
+    </PressScale>
   )
 }
 
@@ -181,5 +233,7 @@ function Zigzag({ top }: { top?: boolean }) {
 
 const styles = StyleSheet.create({
   paper: { backgroundColor: '#FBFCF8', paddingHorizontal: 20, paddingVertical: 14 },
+  option: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14, borderRadius: 20, borderWidth: 1 },
+  optionIcon: { width: 46, height: 46, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   okRing: { width: 84, height: 84, borderRadius: 42, alignItems: 'center', justifyContent: 'center', borderWidth: 2 },
 })

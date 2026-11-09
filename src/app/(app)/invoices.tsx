@@ -1,5 +1,5 @@
 import { router, type Href } from 'expo-router'
-import { CalendarClock, FileSpreadsheet, FileText, MoreHorizontal, PenLine, Pencil, Printer, Trash2, Undo2, Users } from 'lucide-react-native'
+import { CalendarClock, FileSpreadsheet, FileText, MoreHorizontal, PenLine, Pencil, Printer, Share2, Trash2, Undo2, Users } from 'lucide-react-native'
 import { useMemo, useState, type ReactNode } from 'react'
 import { Pressable, View } from 'react-native'
 import { Badge, Button, Card, DateField, Empty, ErrorBox, Loading, PressScale, Row, Screen, SearchBar, Segmented, Sheet, Txt, useFeedback } from '@/components/ui'
@@ -189,6 +189,7 @@ export default function Invoices() {
           <View style={{ gap: 8 }}>
             {menu.kind === 'sale' && (
               <>
+                <MenuItem icon={<Share2 size={19} color={c.text} />} label={t('mShareTitle')} onPress={() => { setMenu(null); router.push({ pathname: '/receipt/[id]', params: { id: menu.row.id, share: '1' } }) }} />
                 <MenuItem icon={<Printer size={19} color={c.text} />} label={t('printReceipt')} onPress={() => { setMenu(null); router.push(`/receipt/${menu.row.id}`) }} />
                 <MenuItem icon={<Undo2 size={19} color={c.text} />} label={t('mv_return_in')} onPress={() => { setMenu(null); router.push({ pathname: '/return', params: { invoice: String(menu.row.invoice_no) } }) }} />
                 {!!menu.row.party_id && (
