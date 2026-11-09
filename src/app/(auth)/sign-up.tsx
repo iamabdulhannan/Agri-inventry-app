@@ -1,13 +1,15 @@
 import { router, useLocalSearchParams } from 'expo-router'
 import { Building2, CheckCircle2, Lock, Mail, MailCheck, Store, Ticket, User } from 'lucide-react-native'
 import { useState } from 'react'
-import { Pressable, View } from 'react-native'
+import { Linking, Pressable, View } from 'react-native'
 import { Button, ErrorBox, Field, Input, PasswordInput, Row, Screen, Segmented, Txt, Rise } from '@/components/ui'
 import { errText } from '@/lib/errors'
 import { useI18n } from '@/lib/i18n'
 import { supabase, supabaseConfigured } from '@/lib/supabase'
 import { useTheme } from '@/lib/theme'
 import type { Role } from '@/lib/types'
+
+const PRIVACY_URL = 'https://github.com/iamabdulhannan/Agri-inventry-app/blob/main/docs/privacy-policy.md'
 
 type Mode = 'create' | 'join'
 
@@ -162,6 +164,11 @@ export default function SignUp() {
           onPress={submit}
           style={{ marginTop: 6 }}
         />
+        <Pressable onPress={() => Linking.openURL(PRIVACY_URL)} hitSlop={8}>
+          <Txt v="tiny" muted align="center">
+            {t('mAgreePrivacy')} <Txt v="tiny" weight="bold" color={c.primary}>{t('mPrivacyPolicy')}</Txt>
+          </Txt>
+        </Pressable>
         <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 4 }}>
           <Txt muted>{t('haveAccount')}</Txt>
           <Pressable onPress={() => router.replace('/sign-in')}>

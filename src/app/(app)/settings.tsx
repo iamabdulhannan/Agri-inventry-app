@@ -1,7 +1,7 @@
-import { Bell, Building2, FileBadge, KeyRound, MapPin, Phone, Store, User } from 'lucide-react-native'
+import { Bell, Building2, ChevronRight, FileBadge, KeyRound, MapPin, Phone, ShieldCheck, Store, Trash2, User } from 'lucide-react-native'
 import { useEffect, useState } from 'react'
-import { View } from 'react-native'
-import { Button, Card, ErrorBox, Field, IconTile, Input, NumInput, PasswordInput, Row, Screen, Txt, useFeedback } from '@/components/ui'
+import { Linking, View } from 'react-native'
+import { Button, Card, ErrorBox, Field, IconTile, Input, NumInput, PasswordInput, PressScale, Row, Screen, Txt, useFeedback } from '@/components/ui'
 import { useOrg } from '@/lib/app'
 import { errText } from '@/lib/errors'
 import { useI18n } from '@/lib/i18n'
@@ -17,6 +17,8 @@ export default function Settings() {
         <OrgCard />
         <ProfileCard />
         <PasswordCard />
+        <PrivacyCard />
+        <DeleteAccountCard />
       </View>
     </Screen>
   )
@@ -179,6 +181,77 @@ function PasswordCard() {
       </Field>
       {error ? <ErrorBox>{error}</ErrorBox> : null}
       <Button variant="secondary" title={t('updatePassword')} onPress={save} loading={busy} disabled={!pw} />
+    </Card>
+  )
+}
+
+const PRIVACY_URL = 'https://github.com/iamabdulhannan/Agri-inventry-app/blob/main/docs/privacy-policy.md'
+
+function PrivacyCard() {
+  const { t } = useI18n()
+  const { c } = useTheme()
+  return (
+    <PressScale onPress={() => Linking.openURL(PRIVACY_URL)} scaleTo={0.98} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderRadius: 22, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border }}>
+      <IconTile icon={<ShieldCheck size={20} color={c.green} />} tone="green" />
+      <Txt weight="bold" style={{ flex: 1 }}>{t('mPrivacyPolicy')}</Txt>
+      <ChevronRight size={18} color={c.muted} />
+    </PressScale>
+  )
+}
+
+/** Google Play / App Store rule: an account made in the app can be deleted in the app */
+function DeleteAccountCard() {
+  const { t } = useI18n()
+  const { c } = useTheme()
+  const { signOut } = useOrg()
+  const { toast, confirm } = useFeedback()
+  const [open, setOpen] = useState(false)
+  const [typed, setTyped] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const word = t('mDelWord')
+  const ready = typed.trim().toUpperCase() === word.toUpperCase()
+
+  const run = async () => {
+    setError('')
+    if (!(await confirm(t('mDelConfirm'), { okLabel: t('mDelButton') }))) return
+    setBusy(true)
+    const { error } = await supabase.rpc('delete_my_account')
+    if (error) {
+      setBusy(false)
+      const msg = String(error.message ?? '')
+      if (/OWNER_HAS_TEAM/.test(msg)) return setError(t('mDelOwnerTeam'))
+      if (/delete_my_account|schema cache|PGRST202/.test(msg)) return setError(t('errRunMigration', { n: '020' }))
+      return setError(errText(error, t))
+    }
+    toast(t('mDelDone'))
+    await signOut()
+  }
+
+  return (
+    <Card style={{ gap: 12, borderColor: c.red + '40' }}>
+      <Row gap={12}>
+        <IconTile icon={<Trash2 size={20} color={c.red} />} tone="red" />
+        <View style={{ flex: 1 }}>
+          <Txt v="h3">{t('mDelTitle')}</Txt>
+          <Txt v="tiny" muted>{t('mDelSub')}</Txt>
+        </View>
+      </Row>
+      {!open ? (
+        <Button variant="outline" color={c.red} title={t('mDelButton')} onPress={() => setOpen(true)} />
+      ) : (
+        <View style={{ gap: 12 }} collapsable={false}>
+          <Txt v="small">{t('mDelExplain')}</Txt>
+          <Field label={t('mDelType', { word })}>
+            <Input value={typed} onChangeText={setTyped} autoCapitalize="characters" autoCorrect={false} placeholder={word} />
+          </Field>
+          {error ? <ErrorBox>{error}</ErrorBox> : null}
+          <Row gap={10}>
+            <Button variant="secondary" title={t('cancel')} onPress={() => { setOpen(false); setTyped(''); setError('') }} style={{ flex: 1 }} />
+            <Button variant="danger" title={t('mDelButton')} onPress={run} loading={busy} disabled={!ready} style={{ flex: 1 }} />
+          </Row>
+        </View>
+      )}
     </Card>
   )
 }
