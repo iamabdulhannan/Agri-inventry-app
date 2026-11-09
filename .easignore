@@ -47,3 +47,7 @@ yarn-error.*
 .claude
 
 # .env is intentionally NOT ignored here so EAS cloud builds get the EXPO_PUBLIC_* values
+
+# store graphics and docs are not part of the app build
+store/
+docs/
